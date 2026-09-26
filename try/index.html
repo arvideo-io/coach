@@ -392,8 +392,14 @@ function _preset(sport) {
 
 const EXAMPLES = () => [preset('flag'), preset('basketball'), preset('soccer'), preset('wrestling')];
 const STORE = 'gameday.v1';
+// saved state from older builds: the map pin used to be a plain label string
+function normalizeTeam(t) {
+  const m = t && t.data && t.data.map; if (!m) return t;
+  if (typeof m.pin === 'string' || m.pin == null) m.pin = { x: .5, y: .5, label: (typeof m.pin === 'string' ? m.pin : '') || m.pin_label || '' };
+  return t;
+}
 function loadApp() {
-  try { const j = JSON.parse(localStorage.getItem(STORE) || 'null'); if (j && Array.isArray(j.teams) && j.teams.length) return { teams: j.teams, ti: 0, ei: 0, page: 'home', saved: true }; } catch (e) {}
+  try { const j = JSON.parse(localStorage.getItem(STORE) || 'null'); if (j && Array.isArray(j.teams) && j.teams.length) { j.teams.forEach(normalizeTeam); return { teams: j.teams, ti: 0, ei: 0, page: 'home', saved: true }; } } catch (e) {}
   return { teams: EXAMPLES(), ti: 0, ei: 0, page: 'home', saved: false };
 }
 function saveApp() { try { localStorage.setItem(STORE, JSON.stringify({ teams: APP.teams })); APP.saved = true; APP.saveFailed = false; } catch (e) { APP.saveFailed = true; } }
@@ -945,6 +951,7 @@ function scrubImport(t) {
   t.data.wear.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = ''; t.data.map.img = '';
   if (t.data.wear.generic) t.data.wear.generic.color = hex(t.data.wear.generic.color) || t.colors.primary;
   if (typeof t.id !== 'string' || !/^[a-z0-9]{1,16}$/.test(t.id)) delete t.id;
+  normalizeTeam(t);
   if (t.data.link && !/^https?:\/\//i.test(String(t.data.link.url || ''))) t.data.link.url = '';
 }
 async function importFromLink() {
