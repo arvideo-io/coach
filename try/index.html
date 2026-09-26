@@ -136,9 +136,10 @@
   .ts span { font-size:13px; }
   .ts .mu { color:var(--mute); }
   .ts .arrow { font-size:28px; color:var(--mute); line-height:1; }
-  .ts-row { display:flex; gap:6px; }
-  .ts-row .ts { flex:1; min-width:0; }
-  .ts-row .icon { height:auto; width:44px; font-size:20px; color:var(--mute); }
+  .ts-row { position:relative; display:flex; }
+  .ts-row .ts { flex:1; min-width:0; padding-right:38px; }
+  .ts-row .x { position:absolute; top:4px; right:4px; width:28px; height:28px; border:0; background:transparent; border-radius:8px; color:var(--mute); font-size:17px; line-height:1; }
+  .ts-row .x:hover { background:var(--line); color:var(--ink); }
   .wk-edit .row input[type=text] { flex:1; min-width:0; }
   .wk-list { display:flex; flex-direction:column; gap:6px; }
   .wk { display:grid; grid-template-columns:52px 72px 1fr 1fr 70px; gap:8px; align-items:center; text-align:left; background:var(--soft); border:1.5px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13.5px; }
@@ -606,7 +607,7 @@ const hdr = (back, backLabel, sub, title, extra = '') => `<div class="panel" sty
 
 function PageHome() {
   return `<div class="season stack"><div class="panel"><p class="eyebrow">Your teams</p>
-    <div class="ts-list">${APP.teams.map((t, i) => { const sent = t.season.filter(w => w.sent).length; return `<div class="ts-row"><button class="ts" data-act="openTeam" data-id="${i}" style="--c:${t.colors.primary}"><span class="swatch"></span><div><b>${esc(t.data.event.team)}</b><span>${esc(t.data.event.org)}</span><span class="mu">${esc(t.seasonLabel)} · ${sent} of ${t.season.length} sent</span></div><span class="arrow">&rsaquo;</span></button><button class="icon" data-act="delTeam" data-id="${i}" aria-label="Delete ${esc(t.data.event.team)} · ${esc(t.seasonLabel)}">&times;</button></div>`; }).join('')}</div>
+    <div class="ts-list">${APP.teams.map((t, i) => { const sent = t.season.filter(w => w.sent).length; return `<div class="ts-row"><button class="ts" data-act="openTeam" data-id="${i}" style="--c:${t.colors.primary}"><span class="swatch"></span><div><b>${esc(t.data.event.team)}</b><span>${esc(t.data.event.org)}</span><span class="mu">${esc(t.seasonLabel)} · ${sent} of ${t.season.length} sent</span></div><span class="arrow">&rsaquo;</span></button><button class="x" data-act="delTeam" data-id="${i}" aria-label="Delete ${esc(t.data.event.team)} · ${esc(t.seasonLabel)}">&times;</button></div>`; }).join('')}</div>
     <button class="btn alt" data-act="go" data-id="new" style="margin-top:12px;width:100%">+ Add a team-season</button>
     <p class="hint" style="margin-top:12px">${APP.saveFailed ? 'This browser is not saving changes (private window or storage blocked). Everything still works for this visit.' : 'Saved in this browser. To use a team on another phone or computer, open it and tap Team link.'} <button class="add" data-act="reset" style="padding:2px 8px;font-size:12px">Start over with the examples</button></p></div></div>`;
 }
