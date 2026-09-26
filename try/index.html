@@ -878,12 +878,15 @@ function scrubImport(t) {
   t.data.wear.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = '';
   if (t.data.wear.generic) t.data.wear.generic.color = hex(t.data.wear.generic.color) || t.colors.primary;
   if (typeof t.id !== 'string' || !/^[a-z0-9]{1,16}$/.test(t.id)) delete t.id;
+  if (t.data.link && !/^https?:\/\//i.test(String(t.data.link.url || ''))) t.data.link.url = '';
 }
 async function importFromLink() {
   const m = location.hash.match(/^#t=([\w-]+)$/); if (!m) return;
   history.replaceState(null, '', location.pathname);
   let t; try { t = await unsqueeze(m[1]); if (!t || !t.data || !Array.isArray(t.season)) throw 0; scrubImport(t); }
   catch (e) { overlay('<p class="eyebrow">That link is damaged</p><p style="margin:0">Part of it may have been cut off when it was sent. Ask for it again.</p>'); return; }
+  const before = JSON.stringify(APP.teams), tiBefore = APP.ti;
+  try {
   const i = APP.teams.findIndex(x => x.id && x.id === t.id);
   if (i >= 0) {
     const old = APP.teams[i];
@@ -896,6 +899,10 @@ async function importFromLink() {
     APP.teams.push(t); APP.ti = APP.teams.length - 1;
   }
   S = t; applyEvent(t.cur); go('season');
+  } catch (e) {
+    APP.teams = JSON.parse(before); APP.ti = tiBefore; S = APP.teams[APP.ti] || APP.teams[0]; saveApp();
+    overlay('<p class="eyebrow">That link is damaged</p><p style="margin:0">The team in it could not be opened. Nothing on this device was changed.</p>');
+  }
 }
 window.addEventListener('hashchange', importFromLink);
 
