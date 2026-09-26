@@ -3,8 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Day</title>
-<!-- Game Day: single-file static page. Source of truth: GitLab arvideo/gameday, branch prototype/builder-v1.
-     Shared: state + email renderer. Fake: weather, map, no login, no sending, no background removal. -->
+<!-- Game Day: single-file static page. Source of truth: GitLab arvideo/gameday, branch prototype/builder-v1. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
@@ -502,7 +501,7 @@ function footerHTML(flat) {
     h += cardT(head('Questions?', 'Text or email the coaches') + `<tr><td style="padding:4px 18px 6px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>`);
   }
   const tit = `${e.team} ${e.accent}${e.opp ? ` ${e.oppLabel} ${e.opp}` : ''} · ${e.date}${S.on.times ? ' · ' + d.times.rows.map(r => `${r.label} ${r.time}`).join(' · ') : ''}`;
-  h += `<tr><td align="center" style="padding:2px 12px 14px;font-family:${font};font-size:11px;line-height:16px;color:#9aa3aa;text-align:center;">${esc(tit)}<br>Made with Game Day · gameday.arvideo.io</td></tr>`;
+  h += `<tr><td align="center" style="padding:2px 12px 14px;font-family:${font};font-size:11px;line-height:16px;color:#9aa3aa;text-align:center;">${esc(tit)}<br>Made with Game Day · coach.arvideo.io</td></tr>`;
   return `<table role="presentation" width="420" cellpadding="0" cellspacing="0" bgcolor="${deep}" style="width:420px;max-width:100%;background:${deep};table-layout:fixed;${flat ? '' : 'border-radius:0 0 22px 22px;'}">${h}</table>`;
 }
 
