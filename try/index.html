@@ -478,10 +478,34 @@ function aerialHTML(m, editing) {
     <div class="attr">Imagery: USGS NAIP</div></div>`;
 }
 const merc = (lat, lon) => [lon * 20037508.34 / 180, Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180];
-async function geocode(q) {
+// two keyless geocoders: Photon (OpenStreetMap, knows parks and schools by name) then the US Census (knows every US street address)
+async function geocodePhoton(q) {
   const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`);
-  const j = await r.json(); const f = j.features && j.features[0]; if (!f) throw new Error('not found');
+  const j = await r.json(); const f = j.features && j.features[0]; if (!f) return null;
   return { lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], name: f.properties.name || '' };
+}
+function geocodeCensus(q) {
+  // the Census geocoder has no CORS header but supports JSONP
+  return new Promise((res, rej) => {
+    const cb = 'gd_cb_' + Date.now().toString(36); const sc = document.createElement('script');
+    const t = setTimeout(() => { cleanup(); rej(new Error('census timeout')); }, 12000);
+    const cleanup = () => { clearTimeout(t); delete window[cb]; sc.remove(); };
+    window[cb] = j => { cleanup(); const m = j && j.result && j.result.addressMatches && j.result.addressMatches[0]; res(m ? { lon: m.coordinates.x, lat: m.coordinates.y, name: m.matchedAddress || '' } : null); };
+    sc.onerror = () => { cleanup(); rej(new Error('census failed')); };
+    sc.src = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=${encodeURIComponent(q)}&benchmark=Public_AR_Current&format=jsonp&callback=${cb}`;
+    document.head.appendChild(sc);
+  });
+}
+async function geocode(q) {
+  // the street address alone is what the Census wants; the venue name on line 1 helps Photon
+  const lines = q.split(/,\s*|\n/).map(x => x.trim()).filter(Boolean);
+  const street = lines.filter(x => /\d/.test(x) || /,?\s*[A-Z]{2}\b/.test(x)).join(', ') || q;
+  let g = null;
+  try { g = await geocodePhoton(q); } catch (e) {}
+  if (!g && street !== q) { try { g = await geocodePhoton(street); } catch (e) {} }
+  if (!g) { try { g = await geocodeCensus(street); } catch (e) {} }
+  if (!g) throw new Error('not found');
+  return g;
 }
 // span = width of the picture in meters; the image is fetched at 2x for retina and stored as a JPEG data URL
 async function fetchAerial(lat, lon, span) {
@@ -497,7 +521,12 @@ async function findOnMap(recenter) {
     if (st) st.textContent = 'Fetching the aerial…';
     m.img = await fetchAerial(m.center.lat, m.center.lon, m.span);
     render();
-  } catch (e) { if (st) st.textContent = 'Could not find that address. Check it and try again, or upload your own map picture below.'; }
+  } catch (e) {
+    if (st) st.textContent = String(e && e.message).startsWith('imagery') || /fetch/i.test(String(e && e.message))
+      ? 'Found the address, but the aerial photo service did not answer. Try again in a minute, or upload your own map picture below.'
+      : 'Could not find that address. Try it as "street, city, state" (no venue name), or upload your own map picture below.';
+    console.warn('findOnMap', e);
+  }
 }
 async function nudgeMap(op) {
   const m = S.data.map; if (!m.center) return;
