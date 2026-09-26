@@ -228,7 +228,9 @@
   .abox { position:absolute; border:2px solid rgba(255,255,255,.92); background:rgba(255,255,255,.10); display:flex; align-items:center; justify-content:center; pointer-events:none; }
   .aer.editing[data-mode="box"] .abox:not(.ghost) { pointer-events:auto; cursor:move; }
   .abox.ours { border:3px solid #ff1f1f; background:repeating-linear-gradient(45deg, rgba(255,31,31,.55) 0 3px, rgba(255,31,31,.25) 3px 9px); }
-  .abox span { font:400 22px/1 Anton, Impact, sans-serif; color:#fff; text-transform:none; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; padding:2px 4px; text-align:center; }
+  .abox span { white-space:nowrap; font:400 20px/1 Anton, Impact, sans-serif; color:#fff; text-transform:none; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; padding:2px 4px; text-align:center; }
+  .abox.park { border:3px solid #fff; border-radius:12px; background:#1f6fd1; }
+  .abox.park span { font-size:26px; text-shadow:none; }
   .abox.ghost { border:2px dashed #fff; background:rgba(255,255,255,.2); }
   .aer[data-mode="pin"] { cursor:move; }
   .aer .attr { position:absolute; right:6px; bottom:5px; font:600 9.5px/1 Inter, Arial, sans-serif; color:#fff; background:rgba(0,0,0,.45); padding:3px 5px; border-radius:4px; }
@@ -386,7 +388,12 @@ function _preset(sport) {
       event: { org: 'Poolesville Flag Football', what: 'Game Day Info', date: 'Sun · Sep 27', venue: 'EE Halmos Park', team: 'Eagles', accent: 'Week 3', sub: 'Flag Football', ghost: '3', oppLabel: 'VS.', opp: 'Commanders' },
       times: { rows: [ { label: 'Practice', time: '10:30', hot: false }, { label: 'Game', time: '11:30', hot: true } ] },
       wear: { label: 'Wear', big: 'Home Jerseys', tag: 'Dark', style: 'dark', photo: '', generic: { shape: 'tshirt', color: '#004C54', glyph: 'football' } },
-      map: { label: "We're on", big: 'Field 3', address: 'EE Halmos Park\n17001 Hoskinson Rd\nPoolesville, MD', pin: { label: 'Field 3' }, own: '' },
+      map: { label: "We're on", big: 'Field 3', address: 'EE Halmos Park\n17001 Hoskinson Rd\nPoolesville, MD', pin: { label: 'Field 3' }, own: '',
+             center: { lat: 39.134128, lon: -77.412330 }, span: 360, rot: 3,
+             boxes: [ { label: 'Field 1', x0: -8617478.8, y0: 4740925.4, x1: -8617396.3, y1: 4740960.7 },
+                      { label: 'Field 2', x0: -8617478.8, y0: 4740839.3, x1: -8617443.5, y1: 4740921.8 },
+                      { label: 'Field 3', x0: -8617431.3, y0: 4740839.3, x1: -8617395.9, y1: 4740921.8 },
+                      { label: 'P', x0: -8617608, y0: 4740884, x1: -8617590, y1: 4740902 } ] },
       weather: {},
       bring: { items: [ { e: '😁', label: 'Mouthguard' }, { e: '🚩', label: 'Flag belt' }, { e: '💧', label: 'Water' }, { e: '👟', label: 'Cleats' }, { e: '👕', label: 'Jersey' }, { e: '🩳', label: 'Shorts' } ] },
       note: { title: 'Heads up', text: 'Team photos right after the game. Stick around for ten minutes.' },
@@ -499,7 +506,7 @@ function boxDisp(m, bx) {
 const isOurs = (m, bx) => !!bx.label && !!m.big && bx.label.trim().toLowerCase() === m.big.trim().toLowerCase();
 function aerialHTML(m, editing) {
   const boxes = (m.center && Array.isArray(m.boxes)) ? m.boxes : [];
-  const bxs = boxes.map((bx, i) => { const r = boxDisp(m, bx); return `<div class="abox${isOurs(m, bx) ? ' ours' : ''}" data-box="${i}" style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"><span>${esc(bx.label || '')}</span></div>`; }).join('');
+  const bxs = boxes.map((bx, i) => { const r = boxDisp(m, bx); return `<div class="abox${isOurs(m, bx) ? ' ours' : ''}${/^p(arking)?$/i.test(bx.label || '') ? ' park' : ''}" data-box="${i}" style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"><span>${esc(bx.label || '')}</span></div>`; }).join('');
   let pin = '';
   if (!boxes.length && m.center && m.pin && typeof m.pin === 'object' && m.pin.mx != null) { const [px, py] = worldToDisp(m, m.pin.mx, m.pin.my); pin = `<div class="apin" style="left:${px * 100}%;top:${py * 100}%"><div class="dot"></div><div class="lab">${esc(m.pin.label || '')}</div></div>`; }
   return `<div class="aer${editing ? ' editing' : ''}" data-mode="${editing ? (UI.mapMode || 'box') : ''}"><img src="${m.img}" alt="" draggable="false">${bxs}${pin}<div class="attr">Imagery: USGS NAIP</div></div>`;
@@ -509,7 +516,8 @@ const FIELD_SIZES = [['flag', 'NFL FLAG 30×70 yd', 30, 70], ['u6', 'Soccer U6 2
 function addField(key) {
   const m = S.data.map, f = FIELD_SIZES.find(x => x[0] === key); if (!m.center || !f) return;
   const K = Math.cos(m.center.lat * Math.PI / 180), w = f[2] * 0.9144 / K, l = f[3] * 0.9144 / K;   // ground meters → mercator meters
-  const [cx, cy] = merc(m.center.lat, m.center.lon), n = (m.boxes || []).filter(b => /^Field \d+$/i.test(b.label || '')).length;
+  const [cx0, cy] = merc(m.center.lat, m.center.lon), n = (m.boxes || []).filter(b => /^Field \d+$/i.test(b.label || '')).length;
+  const cx = cx0 + n * (w + 3);                                   // each new field one width (plus 3 m) east of the last
   m.boxes = m.boxes || []; m.boxes.push({ x0: cx - w / 2, y0: cy - l / 2, x1: cx + w / 2, y1: cy + l / 2, label: `Field ${n + 1}` });
 }
 const merc = (lat, lon) => [lon * 20037508.34 / 180, Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180];
@@ -560,13 +568,20 @@ async function composeAerial(m) {
   m.img = c.toDataURL('image/jpeg', .85);
 }
 const mapFail = (st, e) => { if (!st) return; st.textContent = /^imagery|fetch|load/i.test(String(e && e.message)) ? 'Found the address, but the aerial photo service did not answer. Try again in a minute, or upload your own map picture below.' : 'Could not find that address. Try it as "street, city, state" (no venue name), or upload your own map picture below.'; console.warn('map', e); };
+// a venue with a center but no picture (preset, or arrived by Team link) fetches its aerial the first time it's shown
+const aerialInFlight = new Set();
+function ensureAerial() {
+  const m = S && S.data && S.data.map; if (!m || !m.center || m.img || m.own || aerialInFlight.has(m) || /claude\.ai$/.test(location.hostname)) return;
+  aerialInFlight.add(m); m.span = m.span || 240;
+  fetchSquare(m.center.lat, m.center.lon, m.span).then(raw => { m.raw = raw; return composeAerial(m); }).then(() => render()).catch(e => console.warn('aerial', e)).finally(() => aerialInFlight.delete(m));
+}
 async function findOnMap(recenter) {
   const m = S.data.map, st = $('#mapStatus');
   // the claude.ai artifact preview blocks outside requests entirely; the real page at arvideo.io does not
   if (/claude\.ai$/.test(location.hostname) || location.hostname.endsWith('.claudeusercontent.com')) { if (st) st.textContent = 'Find on map does not work inside this preview. Open arvideo.io/coach/try/ and it will.'; return; }
   if (st) st.textContent = 'Looking up the address…';
   try {
-    if (!m.center || !recenter) {
+    if (!m.center || recenter) {
       const g = await geocode(m.address.replace(/\n/g, ', ')); m.center = { lat: g.lat, lon: g.lon }; m.span = m.span || 240; m.rot = m.rot || 0; m.boxes = [];
       const keep = (m.pin && typeof m.pin === 'object' && m.pin.label) || m.pin_label || (typeof m.pin === 'string' ? m.pin : ''); const [pmx, pmy] = merc(g.lat, g.lon); m.pin = { mx: pmx, my: pmy, label: keep };
     }
@@ -719,7 +734,7 @@ function fieldsFor(id) {
       + FILE('data.wear.photo', 'Or a photo of the shirt (replaces the generic one)'); }
     case 'map': { const m = get('data.map'); if (typeof m.pin === 'string') { m.pin_label = m.pin; m.pin = null; }
       return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.address', 'Address', { area: true, wide: true })
-      + `<div class="fld wide"><button class="btn alt" data-act="findMap" style="align-self:flex-start">${m.img ? 'Find again from the address' : 'Find on map'}</button><span id="mapStatus" class="hint" style="margin-top:4px"></span></div>`
+      + `<div class="fld wide"><button class="btn alt" data-act="findMap" data-id="${m.img ? 1 : 0}" style="align-self:flex-start">${m.img ? 'Find again from the address' : 'Find on map'}</button>${m.img ? '' : ''}<span id="mapStatus" class="hint" style="margin-top:4px"></span></div>`
       + (m.img && !m.own ? `<div class="fld wide"><span>${(UI.mapMode || 'box') === 'box' ? 'Drag a box around each field (the first one is yours). Arrows move the picture, + and − zoom, ↻ rotates.' : 'Drag the pin onto the field, gym door or parking.'}</span>${aerialHTML(m, true)}
           <div class="mapnav"><div class="seg" style="margin-right:6px"><button data-act="mapMode" data-id="box" aria-pressed="${(UI.mapMode || 'box') === 'box'}">Boxes</button><button data-act="mapMode" data-id="pin" aria-pressed="${UI.mapMode === 'pin'}">Pin</button></div><button class="icon" data-act="nudge" data-id="left" aria-label="Move left">&larr;</button><button class="icon" data-act="nudge" data-id="up" aria-label="Move up">&uarr;</button><button class="icon" data-act="nudge" data-id="down" aria-label="Move down">&darr;</button><button class="icon" data-act="nudge" data-id="right" aria-label="Move right">&rarr;</button><span style="width:6px"></span><button class="icon" data-act="nudge" data-id="in" aria-label="Zoom in">+</button><button class="icon" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button><button class="icon" data-act="nudge" data-id="rot" aria-label="Rotate a quarter turn">&#8635;</button></div>
           <div class="row" style="margin-top:8px"><select id="fieldSize" aria-label="Field size"><option value="">Add a field at true size…</option>${FIELD_SIZES.map(f => `<option value="${f[0]}">${f[1]}</option>`).join('')}</select><button class="add" data-act="addField">Add</button></div>
@@ -860,7 +875,7 @@ function render() {
   $('#app').innerHTML = ({ home: PageHome, new: PageNew, setup: PageSetup, season: PageSeason, event: PageEvent }[APP.page] || PageHome)();
   renderPreviews();
 }
-function go(page) { APP.page = page; UI.editing = null; UI.noteOpen = false; render(); window.scrollTo(0, 0); }
+function go(page) { APP.page = page; UI.editing = null; UI.noteOpen = false; render(); window.scrollTo(0, 0); ensureAerial(); }
 function newFrom(id) {
   let t;
   if (id.startsWith('t')) { t = JSON.parse(JSON.stringify(APP.teams[+id.slice(1)])); delete t.id; t.season = []; t.seasonLabel = 'New season'; t.cur = 0; delete t.data.wear.photo; }
@@ -904,7 +919,7 @@ document.addEventListener('click', ev => {
   else if (act === 'copyPic') return copyPicture();
   else if (act === 'copyText') return copyText();
   else if (act === 'teamLink') return teamLink();
-  else if (act === 'findMap') return findOnMap(false);
+  else if (act === 'findMap') return findOnMap(id === '1');
   else if (act === 'nudge') return nudgeMap(id);
   else if (act === 'mapMode') UI.mapMode = id;
   else if (act === 'boxDel') S.data.map.boxes.splice(+id, 1);
