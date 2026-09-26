@@ -219,6 +219,14 @@
   .fmap .plab { right:6%; top:174px; font:800 15px/1 'Barlow Condensed', sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#fff; background:rgba(0,0,0,.6); padding:5px 8px; border-radius:6px; }
   .fmap .P { left:calc(8% + 8px); bottom:52px; width:30px; height:30px; border-radius:7px; background:#1f6fd1; border:2px solid #fff; font:20px/26px Anton, Impact, sans-serif; text-align:center; }
   .fmap .samp { left:8px; top:8px; font:600 10.5px/1 Inter, sans-serif; color:#fff; background:rgba(0,0,0,.55); padding:4px 7px; border-radius:5px; }
+  .aer { position:relative; width:100%; aspect-ratio:420/250; overflow:hidden; background:#243; touch-action:none; }
+  .aer img { display:block; width:100%; height:100%; object-fit:cover; user-select:none; }
+  .aer.editing { cursor:crosshair; border-radius:12px; }
+  .apin { position:absolute; transform:translate(-50%, -100%); pointer-events:none; }
+  .apin .dot { width:22px; height:22px; margin:0 auto; border-radius:50% 50% 50% 0; background:#ff2a2a; border:3px solid #fff; transform:rotate(-45deg); box-shadow:0 3px 6px rgba(0,0,0,.5); }
+  .apin .lab { margin-top:6px; font:800 14px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#fff; background:rgba(0,0,0,.65); padding:5px 8px; border-radius:6px; white-space:nowrap; transform:translateX(calc(50% - 50%)); }
+  .aer .attr { position:absolute; right:6px; bottom:5px; font:600 9.5px/1 Inter, Arial, sans-serif; color:#fff; background:rgba(0,0,0,.45); padding:3px 5px; border-radius:4px; }
+  .mapnav { display:flex; gap:4px; margin-top:8px; }
   .wx { background:linear-gradient(160deg, #1e6fb8 0%, #0f3f73 100%); padding:16px 18px; }
   .wx .topr { display:flex; align-items:center; gap:14px; margin-top:10px; }
   .wx .deg { font:76px/.9 Anton, Impact, sans-serif; }
@@ -305,7 +313,7 @@ function _preset(sport) {
       event: { org: 'Poolesville Wildcats · JV Basketball', what: 'Game Day Info', date: 'Fri · Dec 5', venue: 'Clarksburg HS', team: 'Wildcats', accent: 'Game 2', sub: 'Away', ghost: '2', oppLabel: 'AT', opp: 'Clarksburg' },
       times: { rows: [ { label: 'Bus departs', time: '4:15', hot: false }, { label: 'Warm-up', time: '5:15', hot: false }, { label: 'Tip-off', time: '6:00', hot: true } ] },
       wear: { label: 'Wear', big: 'Away Jerseys', tag: 'Navy · white shorts', style: 'light', photo: '', generic: { shape: 'tshirt', color: '#0b2a5b', glyph: 'basketball' } },
-      map: { label: 'Play at', big: 'Main Gym', address: 'Clarksburg High School\n22500 Wims Rd\nClarksburg, MD', pin: 'Gym doors', own: '' },
+      map: { label: 'Play at', big: 'Main Gym', address: 'Clarksburg High School\n22500 Wims Rd\nClarksburg, MD', pin: { x: .5, y: .5, label: 'Gym doors' }, own: '' },
       weather: {},
       bring: { items: [ { e: '🏀', label: 'Both jerseys' }, { e: '👟', label: 'Court shoes' }, { e: '💧', label: 'Water' }, { e: '😁', label: 'Mouthguard' }, { e: '🧥', label: 'Warm-ups' }, { e: '🍌', label: 'Snack for the bus' } ] },
       note: { title: 'Heads up', text: '' },
@@ -327,7 +335,7 @@ function _preset(sport) {
       event: { org: 'Poolesville Rec Soccer · U6 Girls', what: 'Game Day Info', date: 'Sat · Sep 19', venue: 'Stevens Park', team: 'Yellow Lightning', accent: 'Week 2', sub: 'Soccer', ghost: '2', oppLabel: 'VS.', opp: '' },
       times: { rows: [ { label: 'Arrive', time: '8:45', hot: false }, { label: 'Game', time: '9:00', hot: true } ] },
       wear: { label: 'Wear', big: 'Yellow Shirt', tag: 'Shin guards under socks', style: 'dark', photo: '', generic: { shape: 'tshirt', color: '#f5d000', glyph: 'soccer' } },
-      map: { label: "We're on", big: 'Field 4', address: 'Stevens Park\n19900 Fisher Ave\nPoolesville, MD', pin: 'Field 4', own: '' },
+      map: { label: "We're on", big: 'Field 4', address: 'Stevens Park\n19900 Fisher Ave\nPoolesville, MD', pin: { x: .5, y: .5, label: 'Field 4' }, own: '' },
       weather: {},
       bring: { items: [ { e: '⚽', label: 'Ball' }, { e: '🦵', label: 'Shin guards' }, { e: '💧', label: 'Water' }, { e: '👟', label: 'Cleats' }, { e: '🍊', label: 'Snack' }, { e: '🧴', label: 'Sunscreen' } ] },
       note: { title: 'Heads up', text: '' },
@@ -349,7 +357,7 @@ function _preset(sport) {
       event: { org: 'Northwood High Wrestling', what: 'Meet Day Info', date: 'Tue · Dec 8', venue: 'Damascus HS Gym', team: 'Varsity', accent: 'Dual Meet', sub: 'Away', ghost: 'W', oppLabel: 'AT', opp: 'Damascus' },
       times: { rows: [ { label: 'Bus departs', time: '3:15', hot: false }, { label: 'Weigh-in', time: '4:30', hot: false }, { label: 'Doors open', time: '5:30', hot: false }, { label: 'First whistle', time: '6:00', hot: true } ] },
       wear: { label: 'Wear', big: 'Maroon Singlet', tag: 'Team warm-ups on the bus', style: 'light', photo: '', generic: { shape: '', color: '#6b1220', glyph: 'none' } },
-      map: { label: 'Park at', big: 'Gym Entrance', address: 'Damascus High School\n25921 Ridge Rd\nDamascus, MD', pin: 'Gym doors', own: '' },
+      map: { label: 'Park at', big: 'Gym Entrance', address: 'Damascus High School\n25921 Ridge Rd\nDamascus, MD', pin: { x: .5, y: .5, label: 'Gym doors' }, own: '' },
       weather: {},
       bring: { items: [ { e: '🤼', label: 'Singlet' }, { e: '🎧', label: 'Headgear' }, { e: '👟', label: 'Shoes' }, { e: '💧', label: 'Water' }, { e: '😁', label: 'Mouthguard' }, { e: '🍌', label: 'Snack after weigh-in' } ] },
       note: { title: 'Parents', text: 'JV wrestles first. Varsity starts around 7:00.\nAdmission is $5 at the door, students free.' },
@@ -372,7 +380,7 @@ function _preset(sport) {
       event: { org: 'Poolesville Flag Football', what: 'Game Day Info', date: 'Sun · Sep 27', venue: 'EE Halmos Park', team: 'Eagles', accent: 'Week 3', sub: 'Flag Football', ghost: '3', oppLabel: 'VS.', opp: 'Commanders' },
       times: { rows: [ { label: 'Practice', time: '10:30', hot: false }, { label: 'Game', time: '11:30', hot: true } ] },
       wear: { label: 'Wear', big: 'Home Jerseys', tag: 'Dark', style: 'dark', photo: '', generic: { shape: 'tshirt', color: '#004C54', glyph: 'football' } },
-      map: { label: "We're on", big: 'Field 3', address: 'EE Halmos Park\n17001 Hoskinson Rd\nPoolesville, MD', pin: 'Field 3', own: '' },
+      map: { label: "We're on", big: 'Field 3', address: 'EE Halmos Park\n17001 Hoskinson Rd\nPoolesville, MD', pin: { x: .5, y: .5, label: 'Field 3' }, own: '' },
       weather: {},
       bring: { items: [ { e: '😁', label: 'Mouthguard' }, { e: '🚩', label: 'Flag belt' }, { e: '💧', label: 'Water' }, { e: '👟', label: 'Cleats' }, { e: '👕', label: 'Jersey' }, { e: '🩳', label: 'Shorts' } ] },
       note: { title: 'Heads up', text: 'Team photos right after the game. Stick around for ten minutes.' },
@@ -403,7 +411,7 @@ function applyEvent(i) {
   if (r.times) S.data.times.rows = r.times;
   if (r.venue) e.venue = r.venue;
   if (r.address) S.data.map.address = r.address;
-  S.data.map.big = r.where;
+  S.data.map.big = r.where; if (S.data.map.pin && typeof S.data.map.pin === 'object' && /^Field/.test(r.where)) S.data.map.pin.label = r.where;
   if (flag) { S.data.wear.big = r.home ? 'Home Jerseys' : 'Away Jerseys'; S.data.wear.tag = r.home ? 'Dark' : 'White'; S.data.wear.style = r.home ? 'dark' : 'light'; }
   if (S.sport === 'basketball') { S.data.wear.big = r.home ? 'Home Jerseys' : 'Away Jerseys'; S.data.wear.tag = r.home ? 'White · navy shorts' : 'Navy · white shorts'; S.data.wear.style = r.home ? 'dark' : 'light'; S.data.wear.generic.color = r.home ? '#f4f4f4' : S.colors.primary; }
   S.on.note = !!(r.note && r.note.trim()); if (r.note) S.data.note = { title: 'Heads up', text: r.note };
@@ -413,7 +421,7 @@ APP.teams.forEach(t => { S = t; applyEvent(t.cur); }); S = APP.teams[0];
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const get = path => path.split('.').reduce((o, k) => (o == null ? o : o[k]), S);
-function set(path, v) { const ks = path.split('.'); const last = ks.pop(); ks.reduce((o, k) => o[k], S)[last] = v; }
+function set(path, v) { const ks = path.split('.'); const last = ks.pop(); ks.reduce((o, k) => (o[k] == null ? (o[k] = {}) : o[k]), S)[last] = v; }
 const fid = path => 'f-' + path.replace(/\W+/g, '-');
 
 /* ---------------- the email ---------------- */
@@ -435,7 +443,7 @@ function blockHTML(id) {
       <div class="chic jersey ${w.style}${art ? ' has' : ''}"><div class="txt"><div class="label">${esc(w.label)}</div><div class="big">${esc(w.big)}</div>${w.tag ? `<div class="tag">${esc(w.tag)}</div>` : ''}</div>${art}</div>`; }
     case 'map': { const m = d.map; return `
       <div class="chic field"><div class="hd"><div><div class="label">${esc(m.label)}</div><div class="big">${esc(m.big)}</div></div><div class="addr">${esc(m.address)}</div></div>
-      ${m.own ? `<img class="own" src="${m.own}" alt="">` : `<div class="fmap"><div class="g2"></div><div class="road"></div><div class="dash"></div><div class="lot"></div><div class="bays"></div><div class="bldg"></div><div class="roof"></div><div class="P">P</div><div class="pin"></div><div class="plab">${esc(m.pin)}</div><div class="samp">Sample map. The real one is a satellite photo of this address.</div></div>`}</div>`; }
+      ${m.own ? `<img class="own" src="${m.own}" alt="">` : m.img ? aerialHTML(m) : `<div class="fmap"><div class="g2"></div><div class="road"></div><div class="dash"></div><div class="lot"></div><div class="bays"></div><div class="bldg"></div><div class="roof"></div><div class="P">P</div><div class="pin"></div><div class="plab">${esc(m.pin && m.pin.label || '')}</div><div class="samp">Sample map. The real one is a satellite photo of this address.</div></div>`}</div>`; }
     case 'weather': return `
       <div class="chic wx"><div class="label" style="opacity:.75">Forecast</div>
         <div class="topr"><div class="sun"></div><div class="deg">64°</div><div><div class="cond">Mostly sunny</div><div class="when">at ${esc(hotTime())}<br>${esc(e.venue)}</div></div></div>
@@ -454,6 +462,56 @@ function blockHTML(id) {
 // the email is a picture on top and live HTML underneath (as the flag email is): blocks with buttons live in the HTML part
 const TEXT_BLOCKS = ['coach', 'link'];
 const visible = () => S.order.filter(id => S.on[id] && !TEXT_BLOCKS.includes(id));
+
+/* ---------------- map: address → Photon geocode → USGS NAIP aerial (public domain, no key), fetched once and saved with the venue ---------------- */
+const MAPW = 420, MAPH = 250;
+function aerialHTML(m, editing) {
+  const px = (m.pin ? m.pin.x : .5) * 100, py = (m.pin ? m.pin.y : .5) * 100;
+  return `<div class="aer${editing ? ' editing' : ''}"><img src="${m.img}" alt="" draggable="false">
+    <div class="apin" style="left:${px}%;top:${py}%"><div class="dot"></div><div class="lab">${esc((m.pin && typeof m.pin === 'object' ? m.pin.label : m.pin) || m.pin_label || '')}</div></div>
+    <div class="attr">Imagery: USGS NAIP</div></div>`;
+}
+const merc = (lat, lon) => [lon * 20037508.34 / 180, Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180];
+async function geocode(q) {
+  const r = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`);
+  const j = await r.json(); const f = j.features && j.features[0]; if (!f) throw new Error('not found');
+  return { lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], name: f.properties.name || '' };
+}
+// span = width of the picture in meters; the image is fetched at 2x for retina and stored as a JPEG data URL
+async function fetchAerial(lat, lon, span) {
+  const [x, y] = merc(lat, lon), hw = span / 2, hh = hw * MAPH / MAPW;
+  const u = `https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?bbox=${x - hw},${y - hh},${x + hw},${y + hh}&bboxSR=3857&imageSR=3857&size=${MAPW * 2},${MAPH * 2}&format=jpg&f=image`;
+  const r = await fetch(u); if (!r.ok) throw new Error('imagery ' + r.status);
+  const b = await r.blob(); return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); });
+}
+async function findOnMap(recenter) {
+  const m = S.data.map, st = $('#mapStatus'); if (st) st.textContent = 'Looking up the address…';
+  try {
+    if (!m.center || !recenter) { const g = await geocode(m.address.replace(/\n/g, ', ')); m.center = { lat: g.lat, lon: g.lon }; m.span = m.span || 320; const keep = (m.pin && typeof m.pin === 'object' && m.pin.label) || m.pin_label || (typeof m.pin === 'string' ? m.pin : ''); m.pin = { x: .5, y: .5, label: keep }; }
+    if (st) st.textContent = 'Fetching the aerial…';
+    m.img = await fetchAerial(m.center.lat, m.center.lon, m.span);
+    render();
+  } catch (e) { if (st) st.textContent = 'Could not find that address. Check it and try again, or upload your own map picture below.'; }
+}
+async function nudgeMap(op) {
+  const m = S.data.map; if (!m.center) return;
+  const [x, y] = merc(m.center.lat, m.center.lon), step = m.span * .25;
+  const unmerc = (mx, my) => ({ lon: mx / 20037508.34 * 180, lat: Math.atan(Math.exp(my / 20037508.34 * Math.PI)) * 360 / Math.PI - 90 });
+  if (op === 'in') m.span = Math.max(80, m.span / 2); else if (op === 'out') m.span = Math.min(2560, m.span * 2);
+  else if (op === 'left') m.center = unmerc(x - step, y); else if (op === 'right') m.center = unmerc(x + step, y);
+  else if (op === 'up') m.center = unmerc(x, y + step * MAPH / MAPW); else if (op === 'down') m.center = unmerc(x, y - step * MAPH / MAPW);
+  const st = $('#mapStatus'); if (st) st.textContent = 'Fetching…';
+  try { m.img = await fetchAerial(m.center.lat, m.center.lon, m.span); render(); } catch (e) { if (st) st.textContent = 'Could not fetch the aerial. Try again.'; }
+}
+// the pin is dragged in the editor's copy of the map; the block re-renders from the stored fraction
+document.addEventListener('pointerdown', ev => {
+  const host = ev.target.closest('.aer.editing'); if (!host) return;
+  const m = S.data.map; if (!m.pin || typeof m.pin !== 'object') return;
+  const move = e => { const r = host.getBoundingClientRect(); m.pin.x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); m.pin.y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)); const pin = host.querySelector('.apin'); pin.style.left = m.pin.x * 100 + '%'; pin.style.top = m.pin.y * 100 + '%'; };
+  move(ev); ev.preventDefault();
+  const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); renderPreviews(); saveApp(); };
+  document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+});
 
 /* generic shirt: Phosphor Icons (MIT), filled t-shirt + sport marks; the real app adds photographed blank jersey/singlet, tinted per team */
 const SHAPES = { tshirt: 'M247.59,61.22,195.83,33A8,8,0,0,0,192,32H160a8,8,0,0,0-8,8,24,24,0,0,1-48,0,8,8,0,0,0-8-8H64a8,8,0,0,0-3.84,1L8.41,61.22A15.76,15.76,0,0,0,1.82,82.48l19.27,36.81A16.37,16.37,0,0,0,35.67,128H56v80a16,16,0,0,0,16,16H184a16,16,0,0,0,16-16V128h20.34a16.37,16.37,0,0,0,14.58-8.71l19.27-36.81A15.76,15.76,0,0,0,247.59,61.22ZM35.67,112a.62.62,0,0,1-.41-.13L16.09,75.26,56,53.48V112Zm185.07-.14a.55.55,0,0,1-.41.14H200V53.48l39.92,21.78Z' };
@@ -527,9 +585,10 @@ function textBlock() {
 }
 
 /* ---------------- editors (only for blocks that are on: the chiclets drive the questions) ---------------- */
+const getSafe = path => { try { return get(path); } catch (e) { return ''; } };
 const F = (path, label, o = {}) => `<label class="fld${o.wide ? ' wide' : ''}" for="${fid(path)}"><span>${label}</span>${
-  o.area ? `<textarea id="${fid(path)}" data-path="${path}" rows="3">${esc(get(path))}</textarea>`
-         : `<input id="${fid(path)}" type="${o.type || 'text'}" data-path="${path}" value="${esc(get(path))}">`}</label>`;
+  o.area ? `<textarea id="${fid(path)}" data-path="${path}" rows="3">${esc(getSafe(path))}</textarea>`
+         : `<input id="${fid(path)}" type="${o.type || 'text'}" data-path="${path}" value="${esc(getSafe(path))}">`}</label>`;
 const FILE = (path, label, sfx = '') => `<label class="fld wide" for="${fid(path) + sfx}"><span>${label}</span><input id="${fid(path) + sfx}" type="file" accept="image/*" data-file="${path}">${get(path) ? `<button class="add" data-act="clear" data-path="${path}">Remove image</button>` : ''}</label>`;
 function LIST(path, cols, addLabel) {
   return `<div class="rows">${get(path).map((r, i) => `<div class="row">${cols.map(c => c.check
@@ -547,7 +606,13 @@ function fieldsFor(id) {
       + `<p class="hint"><b>Shirt picture.</b> No photo handy, or the only photo has a kid in it? Pick a generic shirt. The photo option needs a flat shot of just the shirt; the app cuts out the background.</p>`
       + sel('data.wear.generic.shape', 'Generic shirt', [['tshirt', 'T-shirt'], ['', 'None']]) + F('data.wear.generic.color', 'Shirt color', { type: 'color' }) + sel('data.wear.generic.glyph', 'Mark on it', [['none', 'None'], ['soccer', 'Soccer ball'], ['football', 'Football'], ['basketball', 'Basketball']])
       + FILE('data.wear.photo', 'Or a photo of the shirt (replaces the generic one)'); }
-    case 'map': return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.pin', 'Pin label') + F('data.map.address', 'Address. The real app finds this on a satellite map and lets you nudge the pin.', { area: true, wide: true }) + FILE('data.map.own', 'Or upload your own parking diagram');
+    case 'map': { const m = get('data.map'); if (typeof m.pin === 'string') { m.pin_label = m.pin; m.pin = null; }
+      return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.address', 'Address', { area: true, wide: true })
+      + `<div class="fld wide"><button class="btn alt" data-act="findMap" style="align-self:flex-start">${m.img ? 'Find again from the address' : 'Find on map'}</button><span id="mapStatus" class="hint" style="margin-top:4px"></span></div>`
+      + (m.img && !m.own ? `<div class="fld wide"><span>Drag the pin onto the field, gym door or parking. Arrows move the picture, + and − zoom.</span>${aerialHTML(m, true)}
+          <div class="mapnav"><button class="icon" data-act="nudge" data-id="left" aria-label="Move left">&larr;</button><button class="icon" data-act="nudge" data-id="up" aria-label="Move up">&uarr;</button><button class="icon" data-act="nudge" data-id="down" aria-label="Move down">&darr;</button><button class="icon" data-act="nudge" data-id="right" aria-label="Move right">&rarr;</button><span style="width:10px"></span><button class="icon" data-act="nudge" data-id="in" aria-label="Zoom in">+</button><button class="icon" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button></div></div>` : '')
+      + F('data.map.pin.label', 'Pin label')
+      + FILE('data.map.own', 'Or upload your own parking diagram (replaces the aerial)'); }
     case 'weather': return `<p class="hint">Nothing to fill in. The forecast for the main time at the venue address is added when the email is built.</p>`;
     case 'bring': return LIST('data.bring.items', [{ k: 'e', label: 'Icon', cls: 'e' }, { k: 'label', label: 'Item' }], 'Add an item');
     case 'note': return F('data.note.title', 'Heading') + F('data.note.text', 'Note', { area: true, wide: true });
@@ -726,6 +791,8 @@ document.addEventListener('click', ev => {
   else if (act === 'copyPic') return copyPicture();
   else if (act === 'copyText') return copyText();
   else if (act === 'teamLink') return teamLink();
+  else if (act === 'findMap') return findOnMap(false);
+  else if (act === 'nudge') return nudgeMap(id);
   else if (act === 'copyLink') { const o = $('#linkOut'); try { navigator.clipboard.writeText(o.value).then(() => { b.textContent = 'Copied'; }, () => o.select()); } catch (e) { o.select(); } return; }
   else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
   render();
@@ -861,7 +928,7 @@ async function unsqueeze(str) { return JSON.parse(await pipe(unb64u(str), new De
 async function teamLink() {
   S.id = S.id || rid(); saveApp();
   // pictures are too big to ride in a link; they stay on the device that added them
-  const t = JSON.parse(JSON.stringify(S)); t.data.wear.photo = ''; t.data.map.own = '';
+  const t = JSON.parse(JSON.stringify(S)); t.data.wear.photo = ''; t.data.map.own = ''; t.data.map.img = '';
   const url = `${location.origin}${location.pathname}#t=${await squeeze(t)}`;
   overlay(`<p class="eyebrow">Team link · ${esc(S.data.event.team)}</p><p style="margin:0">Open this link on any phone or computer and the team is there, schedule and all. Anyone you send it to gets a copy, so share it with co-coaches only.</p>
     <textarea readonly id="linkOut" style="min-height:96px;font-size:11.5px;word-break:break-all">${esc(url)}</textarea>
@@ -875,7 +942,7 @@ function scrubImport(t) {
   t.colors = t.colors || {};
   for (const k of ['primary', 'deep', 'accent']) t.colors[k] = hex(t.colors[k]) || ex.colors[k];
   if (!t.data.wear) t.data.wear = ex.data.wear;
-  t.data.wear.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = '';
+  t.data.wear.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = ''; t.data.map.img = '';
   if (t.data.wear.generic) t.data.wear.generic.color = hex(t.data.wear.generic.color) || t.colors.primary;
   if (typeof t.id !== 'string' || !/^[a-z0-9]{1,16}$/.test(t.id)) delete t.id;
   if (t.data.link && !/^https?:\/\//i.test(String(t.data.link.url || ''))) t.data.link.url = '';
@@ -890,7 +957,7 @@ async function importFromLink() {
   const i = APP.teams.findIndex(x => x.id && x.id === t.id);
   if (i >= 0) {
     const old = APP.teams[i];
-    t.data.wear.photo = old.data.wear.photo || ''; t.data.map.own = old.data.map.own || '';
+    t.data.wear.photo = old.data.wear.photo || ''; t.data.map.own = old.data.map.own || ''; t.data.map.img = old.data.map.img || '';
     if (JSON.stringify(old) !== JSON.stringify(t) && !confirm(`Replace ${old.data.event.team} on this device with the copy in the link?`)) return;
     APP.teams[i] = t; APP.ti = i;
   } else {
