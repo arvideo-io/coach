@@ -225,6 +225,12 @@
   .apin { position:absolute; transform:translate(-50%, -100%); pointer-events:none; }
   .apin .dot { width:22px; height:22px; margin:0 auto; border-radius:50% 50% 50% 0; background:#ff2a2a; border:3px solid #fff; transform:rotate(-45deg); box-shadow:0 3px 6px rgba(0,0,0,.5); }
   .apin .lab { margin-top:6px; font:800 14px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#fff; background:rgba(0,0,0,.65); padding:5px 8px; border-radius:6px; white-space:nowrap; transform:translateX(calc(50% - 50%)); }
+  .abox { position:absolute; border:2px solid rgba(255,255,255,.92); background:rgba(255,255,255,.10); display:flex; align-items:center; justify-content:center; pointer-events:none; }
+  .aer.editing[data-mode="box"] .abox:not(.ghost) { pointer-events:auto; cursor:move; }
+  .abox.ours { border:3px solid #ff1f1f; background:repeating-linear-gradient(45deg, rgba(255,31,31,.55) 0 3px, rgba(255,31,31,.25) 3px 9px); }
+  .abox span { font:400 22px/1 Anton, Impact, sans-serif; color:#fff; text-transform:none; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; padding:2px 4px; text-align:center; }
+  .abox.ghost { border:2px dashed #fff; background:rgba(255,255,255,.2); }
+  .aer[data-mode="pin"] { cursor:move; }
   .aer .attr { position:absolute; right:6px; bottom:5px; font:600 9.5px/1 Inter, Arial, sans-serif; color:#fff; background:rgba(0,0,0,.45); padding:3px 5px; border-radius:4px; }
   .mapnav { display:flex; gap:4px; margin-top:8px; }
   .wx { background:linear-gradient(160deg, #1e6fb8 0%, #0f3f73 100%); padding:16px 18px; }
@@ -313,7 +319,7 @@ function _preset(sport) {
       event: { org: 'Poolesville Wildcats · JV Basketball', what: 'Game Day Info', date: 'Fri · Dec 5', venue: 'Clarksburg HS', team: 'Wildcats', accent: 'Game 2', sub: 'Away', ghost: '2', oppLabel: 'AT', opp: 'Clarksburg' },
       times: { rows: [ { label: 'Bus departs', time: '4:15', hot: false }, { label: 'Warm-up', time: '5:15', hot: false }, { label: 'Tip-off', time: '6:00', hot: true } ] },
       wear: { label: 'Wear', big: 'Away Jerseys', tag: 'Navy · white shorts', style: 'light', photo: '', generic: { shape: 'tshirt', color: '#0b2a5b', glyph: 'basketball' } },
-      map: { label: 'Play at', big: 'Main Gym', address: 'Clarksburg High School\n22500 Wims Rd\nClarksburg, MD', pin: { x: .5, y: .5, label: 'Gym doors' }, own: '' },
+      map: { label: 'Play at', big: 'Main Gym', address: 'Clarksburg High School\n22500 Wims Rd\nClarksburg, MD', pin: { label: 'Gym doors' }, own: '' },
       weather: {},
       bring: { items: [ { e: '🏀', label: 'Both jerseys' }, { e: '👟', label: 'Court shoes' }, { e: '💧', label: 'Water' }, { e: '😁', label: 'Mouthguard' }, { e: '🧥', label: 'Warm-ups' }, { e: '🍌', label: 'Snack for the bus' } ] },
       note: { title: 'Heads up', text: '' },
@@ -335,7 +341,7 @@ function _preset(sport) {
       event: { org: 'Poolesville Rec Soccer · U6 Girls', what: 'Game Day Info', date: 'Sat · Sep 19', venue: 'Stevens Park', team: 'Yellow Lightning', accent: 'Week 2', sub: 'Soccer', ghost: '2', oppLabel: 'VS.', opp: '' },
       times: { rows: [ { label: 'Arrive', time: '8:45', hot: false }, { label: 'Game', time: '9:00', hot: true } ] },
       wear: { label: 'Wear', big: 'Yellow Shirt', tag: 'Shin guards under socks', style: 'dark', photo: '', generic: { shape: 'tshirt', color: '#f5d000', glyph: 'soccer' } },
-      map: { label: "We're on", big: 'Field 4', address: 'Stevens Park\n19900 Fisher Ave\nPoolesville, MD', pin: { x: .5, y: .5, label: 'Field 4' }, own: '' },
+      map: { label: "We're on", big: 'Field 4', address: 'Stevens Park\n19900 Fisher Ave\nPoolesville, MD', pin: { label: 'Field 4' }, own: '' },
       weather: {},
       bring: { items: [ { e: '⚽', label: 'Ball' }, { e: '🦵', label: 'Shin guards' }, { e: '💧', label: 'Water' }, { e: '👟', label: 'Cleats' }, { e: '🍊', label: 'Snack' }, { e: '🧴', label: 'Sunscreen' } ] },
       note: { title: 'Heads up', text: '' },
@@ -357,7 +363,7 @@ function _preset(sport) {
       event: { org: 'Northwood High Wrestling', what: 'Meet Day Info', date: 'Tue · Dec 8', venue: 'Damascus HS Gym', team: 'Varsity', accent: 'Dual Meet', sub: 'Away', ghost: 'W', oppLabel: 'AT', opp: 'Damascus' },
       times: { rows: [ { label: 'Bus departs', time: '3:15', hot: false }, { label: 'Weigh-in', time: '4:30', hot: false }, { label: 'Doors open', time: '5:30', hot: false }, { label: 'First whistle', time: '6:00', hot: true } ] },
       wear: { label: 'Wear', big: 'Maroon Singlet', tag: 'Team warm-ups on the bus', style: 'light', photo: '', generic: { shape: '', color: '#6b1220', glyph: 'none' } },
-      map: { label: 'Park at', big: 'Gym Entrance', address: 'Damascus High School\n25921 Ridge Rd\nDamascus, MD', pin: { x: .5, y: .5, label: 'Gym doors' }, own: '' },
+      map: { label: 'Park at', big: 'Gym Entrance', address: 'Damascus High School\n25921 Ridge Rd\nDamascus, MD', pin: { label: 'Gym doors' }, own: '' },
       weather: {},
       bring: { items: [ { e: '🤼', label: 'Singlet' }, { e: '🎧', label: 'Headgear' }, { e: '👟', label: 'Shoes' }, { e: '💧', label: 'Water' }, { e: '😁', label: 'Mouthguard' }, { e: '🍌', label: 'Snack after weigh-in' } ] },
       note: { title: 'Parents', text: 'JV wrestles first. Varsity starts around 7:00.\nAdmission is $5 at the door, students free.' },
@@ -380,7 +386,7 @@ function _preset(sport) {
       event: { org: 'Poolesville Flag Football', what: 'Game Day Info', date: 'Sun · Sep 27', venue: 'EE Halmos Park', team: 'Eagles', accent: 'Week 3', sub: 'Flag Football', ghost: '3', oppLabel: 'VS.', opp: 'Commanders' },
       times: { rows: [ { label: 'Practice', time: '10:30', hot: false }, { label: 'Game', time: '11:30', hot: true } ] },
       wear: { label: 'Wear', big: 'Home Jerseys', tag: 'Dark', style: 'dark', photo: '', generic: { shape: 'tshirt', color: '#004C54', glyph: 'football' } },
-      map: { label: "We're on", big: 'Field 3', address: 'EE Halmos Park\n17001 Hoskinson Rd\nPoolesville, MD', pin: { x: .5, y: .5, label: 'Field 3' }, own: '' },
+      map: { label: "We're on", big: 'Field 3', address: 'EE Halmos Park\n17001 Hoskinson Rd\nPoolesville, MD', pin: { label: 'Field 3' }, own: '' },
       weather: {},
       bring: { items: [ { e: '😁', label: 'Mouthguard' }, { e: '🚩', label: 'Flag belt' }, { e: '💧', label: 'Water' }, { e: '👟', label: 'Cleats' }, { e: '👕', label: 'Jersey' }, { e: '🩳', label: 'Shorts' } ] },
       note: { title: 'Heads up', text: 'Team photos right after the game. Stick around for ten minutes.' },
@@ -395,7 +401,11 @@ const STORE = 'gameday.v1';
 // saved state from older builds: the map pin used to be a plain label string
 function normalizeTeam(t) {
   const m = t && t.data && t.data.map; if (!m) return t;
-  if (typeof m.pin === 'string' || m.pin == null) m.pin = { x: .5, y: .5, label: (typeof m.pin === 'string' ? m.pin : '') || m.pin_label || '' };
+  if (typeof m.pin === 'string' || m.pin == null) m.pin = { label: (typeof m.pin === 'string' ? m.pin : '') || m.pin_label || '' };
+  if (m.pin.mx == null && m.center && m.span) { const u = m.pin.u != null ? m.pin.u : (m.pin.x != null ? m.pin.x : .5), v = m.pin.v != null ? m.pin.v : (m.pin.y != null ? m.pin.y * CROP + (1 - CROP) / 2 : .5); [m.pin.mx, m.pin.my] = sqToWorld(m, u, v); }
+  delete m.pin.u; delete m.pin.v; delete m.pin.x; delete m.pin.y;
+  if (!Array.isArray(m.boxes)) m.boxes = []; m.boxes = m.boxes.filter(b => b && typeof b.x0 === 'number'); m.rot = m.rot || 0;
+  // an aerial saved before rotation existed has no raw square; the next rotate/pan refetches it
   return t;
 }
 function loadApp() {
@@ -470,12 +480,37 @@ const TEXT_BLOCKS = ['coach', 'link'];
 const visible = () => S.order.filter(id => S.on[id] && !TEXT_BLOCKS.includes(id));
 
 /* ---------------- map: address → Photon geocode → USGS NAIP aerial (public domain, no key), fetched once and saved with the venue ---------------- */
-const MAPW = 420, MAPH = 250;
+const MAPW = 420, MAPH = 250, CROP = MAPH / MAPW;
+// The aerial is fetched as a SQUARE (side = span mercator meters, 840 px) and stored raw; the block shows it rotated by
+// rot quarter-turns and cropped to the center 420x250. Boxes and the pin are stored in world coordinates (mercator
+// meters), so panning, zooming and rotating the picture never move them off the field they were placed on.
+const rotSq = (u, v, k) => { for (let i = 0; i < ((k % 4) + 4) % 4; i++) { const t = u; u = 1 - v; v = t; } return [u, v]; };
+const sqToDisp = (u, v, k) => { const [a, b] = rotSq(u, v, k); return [a, (b - (1 - CROP) / 2) / CROP]; };
+const dispToSq = (x, y, k) => rotSq(x, y * CROP + (1 - CROP) / 2, -k);
+const worldToSq = (m, mx, my) => { const [cx, cy] = merc(m.center.lat, m.center.lon); return [(mx - (cx - m.span / 2)) / m.span, ((cy + m.span / 2) - my) / m.span]; };
+const sqToWorld = (m, u, v) => { const [cx, cy] = merc(m.center.lat, m.center.lon); return [cx - m.span / 2 + u * m.span, cy + m.span / 2 - v * m.span]; };
+const worldToDisp = (m, mx, my) => { const [u, v] = worldToSq(m, mx, my); return sqToDisp(u, v, m.rot || 0); };
+const dispToWorld = (m, x, y) => { const [u, v] = dispToSq(x, y, m.rot || 0); return sqToWorld(m, u, v); };
+function boxDisp(m, bx) {
+  const [x1, y1] = worldToDisp(m, bx.x0, bx.y0), [x2, y2] = worldToDisp(m, bx.x1, bx.y1);
+  return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+}
+// the highlighted box is whichever label matches the event's "where" (Field 3), so the schedule drives it
+const isOurs = (m, bx) => !!bx.label && !!m.big && bx.label.trim().toLowerCase() === m.big.trim().toLowerCase();
 function aerialHTML(m, editing) {
-  const px = (m.pin ? m.pin.x : .5) * 100, py = (m.pin ? m.pin.y : .5) * 100;
-  return `<div class="aer${editing ? ' editing' : ''}"><img src="${m.img}" alt="" draggable="false">
-    <div class="apin" style="left:${px}%;top:${py}%"><div class="dot"></div><div class="lab">${esc((m.pin && typeof m.pin === 'object' ? m.pin.label : m.pin) || m.pin_label || '')}</div></div>
-    <div class="attr">Imagery: USGS NAIP</div></div>`;
+  const boxes = (m.center && Array.isArray(m.boxes)) ? m.boxes : [];
+  const bxs = boxes.map((bx, i) => { const r = boxDisp(m, bx); return `<div class="abox${isOurs(m, bx) ? ' ours' : ''}" data-box="${i}" style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"><span>${esc(bx.label || '')}</span></div>`; }).join('');
+  let pin = '';
+  if (!boxes.length && m.center && m.pin && typeof m.pin === 'object' && m.pin.mx != null) { const [px, py] = worldToDisp(m, m.pin.mx, m.pin.my); pin = `<div class="apin" style="left:${px * 100}%;top:${py * 100}%"><div class="dot"></div><div class="lab">${esc(m.pin.label || '')}</div></div>`; }
+  return `<div class="aer${editing ? ' editing' : ''}" data-mode="${editing ? (UI.mapMode || 'box') : ''}"><img src="${m.img}" alt="" draggable="false">${bxs}${pin}<div class="attr">Imagery: USGS NAIP</div></div>`;
+}
+// true-size fields, in yards (width x length); placed at the view center and dragged into place
+const FIELD_SIZES = [['flag', 'NFL FLAG 30×70 yd', 30, 70], ['u6', 'Soccer U6 20×30 yd', 20, 30], ['u8', 'Soccer U8 30×50 yd', 30, 50], ['u10', 'Soccer U10 45×70 yd', 45, 70], ['u12', 'Soccer U12 55×85 yd', 55, 85], ['full', 'Soccer full 75×115 yd', 75, 115], ['lax', 'Lacrosse 60×110 yd', 60, 110]];
+function addField(key) {
+  const m = S.data.map, f = FIELD_SIZES.find(x => x[0] === key); if (!m.center || !f) return;
+  const K = Math.cos(m.center.lat * Math.PI / 180), w = f[2] * 0.9144 / K, l = f[3] * 0.9144 / K;   // ground meters → mercator meters
+  const [cx, cy] = merc(m.center.lat, m.center.lon), n = (m.boxes || []).filter(b => /^Field \d+$/i.test(b.label || '')).length;
+  m.boxes = m.boxes || []; m.boxes.push({ x0: cx - w / 2, y0: cy - l / 2, x1: cx + w / 2, y1: cy + l / 2, label: `Field ${n + 1}` });
 }
 const merc = (lat, lon) => [lon * 20037508.34 / 180, Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180];
 // two keyless geocoders: Photon (OpenStreetMap, knows parks and schools by name) then the US Census (knows every US street address)
@@ -511,44 +546,81 @@ async function geocode(q) {
   for (const t of tries) { try { const g = await t(); if (inUS(g)) return g; } catch (e) {} }
   throw new Error('not found');
 }
-// span = width of the picture in meters; the image is fetched at 2x for retina and stored as a JPEG data URL
-async function fetchAerial(lat, lon, span) {
-  const [x, y] = merc(lat, lon), hw = span / 2, hh = hw * MAPH / MAPW;
-  const u = `https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?bbox=${x - hw},${y - hh},${x + hw},${y + hh}&bboxSR=3857&imageSR=3857&size=${MAPW * 2},${MAPH * 2}&format=jpg&f=image`;
+// square aerial, side = span meters, 840 px, stored raw; composeAerial turns it into the rotated 420x250 crop
+async function fetchSquare(lat, lon, span) {
+  const [x, y] = merc(lat, lon), h = span / 2, px = MAPW * 2;
+  const u = `https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?bbox=${x - h},${y - h},${x + h},${y + h}&bboxSR=3857&imageSR=3857&size=${px},${px}&format=jpg&f=image`;
   const r = await fetch(u); if (!r.ok) throw new Error('imagery ' + r.status);
-  const b = await r.blob(); return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); });
+  const bl = await r.blob(); return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(bl); });
 }
+const loadImg = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
+async function composeAerial(m) {
+  const im = await loadImg(m.raw), c = document.createElement('canvas'); c.width = MAPW * 2; c.height = MAPH * 2;
+  const x = c.getContext('2d'); x.translate(c.width / 2, c.height / 2); x.rotate((m.rot || 0) * Math.PI / 2); x.drawImage(im, -c.width / 2, -c.width / 2, c.width, c.width);
+  m.img = c.toDataURL('image/jpeg', .85);
+}
+const mapFail = (st, e) => { if (!st) return; st.textContent = /^imagery|fetch|load/i.test(String(e && e.message)) ? 'Found the address, but the aerial photo service did not answer. Try again in a minute, or upload your own map picture below.' : 'Could not find that address. Try it as "street, city, state" (no venue name), or upload your own map picture below.'; console.warn('map', e); };
 async function findOnMap(recenter) {
-  const m = S.data.map, st = $('#mapStatus'); if (st) st.textContent = 'Looking up the address…';
+  const m = S.data.map, st = $('#mapStatus');
+  // the claude.ai artifact preview blocks outside requests entirely; the real page at arvideo.io does not
+  if (/claude\.ai$/.test(location.hostname) || location.hostname.endsWith('.claudeusercontent.com')) { if (st) st.textContent = 'Find on map does not work inside this preview. Open arvideo.io/coach/try/ and it will.'; return; }
+  if (st) st.textContent = 'Looking up the address…';
   try {
-    if (!m.center || !recenter) { const g = await geocode(m.address.replace(/\n/g, ', ')); m.center = { lat: g.lat, lon: g.lon }; m.span = m.span || 320; const keep = (m.pin && typeof m.pin === 'object' && m.pin.label) || m.pin_label || (typeof m.pin === 'string' ? m.pin : ''); m.pin = { x: .5, y: .5, label: keep }; }
+    if (!m.center || !recenter) {
+      const g = await geocode(m.address.replace(/\n/g, ', ')); m.center = { lat: g.lat, lon: g.lon }; m.span = m.span || 240; m.rot = m.rot || 0; m.boxes = [];
+      const keep = (m.pin && typeof m.pin === 'object' && m.pin.label) || m.pin_label || (typeof m.pin === 'string' ? m.pin : ''); const [pmx, pmy] = merc(g.lat, g.lon); m.pin = { mx: pmx, my: pmy, label: keep };
+    }
     if (st) st.textContent = 'Fetching the aerial…';
-    m.img = await fetchAerial(m.center.lat, m.center.lon, m.span);
+    m.raw = await fetchSquare(m.center.lat, m.center.lon, m.span); await composeAerial(m);
     render();
-  } catch (e) {
-    if (st) st.textContent = String(e && e.message).startsWith('imagery') || /fetch/i.test(String(e && e.message))
-      ? 'Found the address, but the aerial photo service did not answer. Try again in a minute, or upload your own map picture below.'
-      : 'Could not find that address. Try it as "street, city, state" (no venue name), or upload your own map picture below.';
-    console.warn('findOnMap', e);
-  }
+  } catch (e) { mapFail(st, e); }
 }
+// pan/zoom refetch the square; rotate only recomposes
 async function nudgeMap(op) {
   const m = S.data.map; if (!m.center) return;
+  const st = $('#mapStatus');
+  if (op === 'rot') { m.rot = ((m.rot || 0) + 1) % 4; if (st) st.textContent = 'Rotating…'; try { if (!m.raw) m.raw = await fetchSquare(m.center.lat, m.center.lon, m.span); await composeAerial(m); render(); } catch (e) { mapFail(st, e); } return; }
+  const k = m.rot || 0, R = [[1, 0], [0, 1], [-1, 0], [0, -1]][k], U = [[0, 1], [-1, 0], [0, -1], [1, 0]][k];   // display right/up as world east/north
   const [x, y] = merc(m.center.lat, m.center.lon), step = m.span * .25;
   const unmerc = (mx, my) => ({ lon: mx / 20037508.34 * 180, lat: Math.atan(Math.exp(my / 20037508.34 * Math.PI)) * 360 / Math.PI - 90 });
-  if (op === 'in') m.span = Math.max(80, m.span / 2); else if (op === 'out') m.span = Math.min(2560, m.span * 2);
-  else if (op === 'left') m.center = unmerc(x - step, y); else if (op === 'right') m.center = unmerc(x + step, y);
-  else if (op === 'up') m.center = unmerc(x, y + step * MAPH / MAPW); else if (op === 'down') m.center = unmerc(x, y - step * MAPH / MAPW);
-  const st = $('#mapStatus'); if (st) st.textContent = 'Fetching…';
-  try { m.img = await fetchAerial(m.center.lat, m.center.lon, m.span); render(); } catch (e) { if (st) st.textContent = 'Could not fetch the aerial. Try again.'; }
+  const mv = (vx, vy, f) => { m.center = unmerc(x + vx * f, y + vy * f); };
+  if (op === 'in') m.span = Math.max(60, m.span / 1.5); else if (op === 'out') m.span = Math.min(2560, m.span * 1.5);
+  else if (op === 'left') mv(R[0], R[1], -step); else if (op === 'right') mv(R[0], R[1], step);
+  else if (op === 'up') mv(U[0], U[1], step); else if (op === 'down') mv(U[0], U[1], -step);
+  if (st) st.textContent = 'Fetching…';
+  try { m.raw = await fetchSquare(m.center.lat, m.center.lon, m.span); await composeAerial(m); render(); } catch (e) { mapFail(st, e); }
 }
-// the pin is dragged in the editor's copy of the map; the block re-renders from the stored fraction
+// in the editor: pin mode moves the pin; box mode drags a box to draw one, or drags inside an existing box to move it
 document.addEventListener('pointerdown', ev => {
   const host = ev.target.closest('.aer.editing'); if (!host) return;
-  const m = S.data.map; if (!m.pin || typeof m.pin !== 'object') return;
-  const move = e => { const r = host.getBoundingClientRect(); m.pin.x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); m.pin.y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)); const pin = host.querySelector('.apin'); pin.style.left = m.pin.x * 100 + '%'; pin.style.top = m.pin.y * 100 + '%'; };
-  move(ev); ev.preventDefault();
-  const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); renderPreviews(); saveApp(); };
+  const m = S.data.map; if (!m.center) return;
+  const r = host.getBoundingClientRect();
+  const frac = e => [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+  ev.preventDefault();
+  const finish = fn => { const up = () => { document.removeEventListener('pointermove', fn); document.removeEventListener('pointerup', up); render(); }; document.addEventListener('pointermove', fn); document.addEventListener('pointerup', up); };
+  if ((UI.mapMode || 'box') === 'pin') {
+    if (!m.pin || typeof m.pin !== 'object') m.pin = { label: '' };
+    const move = e => { const [x, y] = frac(e); [m.pin.mx, m.pin.my] = dispToWorld(m, x, y); const pin = host.querySelector('.apin'); if (pin) { pin.style.left = x * 100 + '%'; pin.style.top = y * 100 + '%'; } };
+    move(ev); finish(move); return;
+  }
+  const hit = ev.target.closest('.abox'); const [x0, y0] = frac(ev);
+  if (hit && hit.dataset.box != null) {
+    // move the box the pointer landed on
+    const bx = m.boxes[+hit.dataset.box]; let [lx, ly] = dispToWorld(m, x0, y0);
+    const move = e => { const [x, y] = frac(e); const [wx, wy] = dispToWorld(m, x, y); bx.x0 += wx - lx; bx.x1 += wx - lx; bx.y0 += wy - ly; bx.y1 += wy - ly; lx = wx; ly = wy; const rr = boxDisp(m, bx); hit.style.left = rr.x * 100 + '%'; hit.style.top = rr.y * 100 + '%'; };
+    finish(move); return;
+  }
+  const ghost = document.createElement('div'); ghost.className = 'abox ghost'; host.appendChild(ghost);
+  let x1 = x0, y1 = y0;
+  const draw = () => { ghost.style.left = Math.min(x0, x1) * 100 + '%'; ghost.style.top = Math.min(y0, y1) * 100 + '%'; ghost.style.width = Math.abs(x1 - x0) * 100 + '%'; ghost.style.height = Math.abs(y1 - y0) * 100 + '%'; };
+  const move = e => { [x1, y1] = frac(e); draw(); };
+  const up = () => {
+    document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); ghost.remove();
+    if (Math.abs(x1 - x0) < .03 || Math.abs(y1 - y0) < .03) return;                 // a tap, not a box
+    const [ax, ay] = dispToWorld(m, Math.min(x0, x1), Math.min(y0, y1)), [bx2, by2] = dispToWorld(m, Math.max(x0, x1), Math.max(y0, y1));
+    m.boxes = m.boxes || []; m.boxes.push({ x0: Math.min(ax, bx2), y0: Math.min(ay, by2), x1: Math.max(ax, bx2), y1: Math.max(ay, by2), label: '' });
+    render();
+  };
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
 });
 
@@ -648,9 +720,11 @@ function fieldsFor(id) {
     case 'map': { const m = get('data.map'); if (typeof m.pin === 'string') { m.pin_label = m.pin; m.pin = null; }
       return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.address', 'Address', { area: true, wide: true })
       + `<div class="fld wide"><button class="btn alt" data-act="findMap" style="align-self:flex-start">${m.img ? 'Find again from the address' : 'Find on map'}</button><span id="mapStatus" class="hint" style="margin-top:4px"></span></div>`
-      + (m.img && !m.own ? `<div class="fld wide"><span>Drag the pin onto the field, gym door or parking. Arrows move the picture, + and − zoom.</span>${aerialHTML(m, true)}
-          <div class="mapnav"><button class="icon" data-act="nudge" data-id="left" aria-label="Move left">&larr;</button><button class="icon" data-act="nudge" data-id="up" aria-label="Move up">&uarr;</button><button class="icon" data-act="nudge" data-id="down" aria-label="Move down">&darr;</button><button class="icon" data-act="nudge" data-id="right" aria-label="Move right">&rarr;</button><span style="width:10px"></span><button class="icon" data-act="nudge" data-id="in" aria-label="Zoom in">+</button><button class="icon" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button></div></div>` : '')
-      + F('data.map.pin.label', 'Pin label')
+      + (m.img && !m.own ? `<div class="fld wide"><span>${(UI.mapMode || 'box') === 'box' ? 'Drag a box around each field (the first one is yours). Arrows move the picture, + and − zoom, ↻ rotates.' : 'Drag the pin onto the field, gym door or parking.'}</span>${aerialHTML(m, true)}
+          <div class="mapnav"><div class="seg" style="margin-right:6px"><button data-act="mapMode" data-id="box" aria-pressed="${(UI.mapMode || 'box') === 'box'}">Boxes</button><button data-act="mapMode" data-id="pin" aria-pressed="${UI.mapMode === 'pin'}">Pin</button></div><button class="icon" data-act="nudge" data-id="left" aria-label="Move left">&larr;</button><button class="icon" data-act="nudge" data-id="up" aria-label="Move up">&uarr;</button><button class="icon" data-act="nudge" data-id="down" aria-label="Move down">&darr;</button><button class="icon" data-act="nudge" data-id="right" aria-label="Move right">&rarr;</button><span style="width:6px"></span><button class="icon" data-act="nudge" data-id="in" aria-label="Zoom in">+</button><button class="icon" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button><button class="icon" data-act="nudge" data-id="rot" aria-label="Rotate a quarter turn">&#8635;</button></div>
+          <div class="row" style="margin-top:8px"><select id="fieldSize" aria-label="Field size"><option value="">Add a field at true size…</option>${FIELD_SIZES.map(f => `<option value="${f[0]}">${f[1]}</option>`).join('')}</select><button class="add" data-act="addField">Add</button></div>
+          ${(m.boxes || []).length ? `<div class="rows" style="margin-top:8px">${m.boxes.map((bx, i) => `<div class="row"><span class="hot" style="width:14px;height:14px;border-radius:3px;background:${isOurs(m, bx) ? '#ff1f1f' : 'transparent'};border:1.5px solid ${isOurs(m, bx) ? '#ff1f1f' : 'var(--line)'}" title="${isOurs(m, bx) ? 'Highlighted this week' : ''}"></span><input type="text" data-path="data.map.boxes.${i}.label" value="${esc(bx.label || '')}" placeholder="Label (Field 1, Parking…)" aria-label="Box label"><button class="icon" data-act="boxTurn" data-id="${i}" aria-label="Turn this box a quarter turn" title="Turn">&#8635;</button><button class="icon" data-act="boxDel" data-id="${i}" aria-label="Remove box">&times;</button></div>`).join('')}</div><p class="hint">The box whose label matches the event's field ("${esc(m.big || '')}") is highlighted. Drag a box to move it.</p>` : ''}</div>` : '')
+      + ((m.boxes || []).length ? '' : F('data.map.pin.label', 'Pin label'))
       + FILE('data.map.own', 'Or upload your own parking diagram (replaces the aerial)'); }
     case 'weather': return `<p class="hint">Nothing to fill in. The forecast for the main time at the venue address is added when the email is built.</p>`;
     case 'bring': return LIST('data.bring.items', [{ k: 'e', label: 'Icon', cls: 'e' }, { k: 'label', label: 'Item' }], 'Add an item');
@@ -832,6 +906,10 @@ document.addEventListener('click', ev => {
   else if (act === 'teamLink') return teamLink();
   else if (act === 'findMap') return findOnMap(false);
   else if (act === 'nudge') return nudgeMap(id);
+  else if (act === 'mapMode') UI.mapMode = id;
+  else if (act === 'boxDel') S.data.map.boxes.splice(+id, 1);
+  else if (act === 'boxTurn') { const bx = S.data.map.boxes[+id], cx = (bx.x0 + bx.x1) / 2, cy = (bx.y0 + bx.y1) / 2, w = bx.x1 - bx.x0, h = bx.y1 - bx.y0; bx.x0 = cx - h / 2; bx.x1 = cx + h / 2; bx.y0 = cy - w / 2; bx.y1 = cy + w / 2; }
+  else if (act === 'addField') { const sel = $('#fieldSize'); if (sel && sel.value) addField(sel.value); }
   else if (act === 'copyLink') { const o = $('#linkOut'); try { navigator.clipboard.writeText(o.value).then(() => { b.textContent = 'Copied'; }, () => o.select()); } catch (e) { o.select(); } return; }
   else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
   render();
@@ -967,7 +1045,7 @@ async function unsqueeze(str) { return JSON.parse(await pipe(unb64u(str), new De
 async function teamLink() {
   S.id = S.id || rid(); saveApp();
   // pictures are too big to ride in a link; they stay on the device that added them
-  const t = JSON.parse(JSON.stringify(S)); t.data.wear.photo = ''; t.data.map.own = ''; t.data.map.img = '';
+  const t = JSON.parse(JSON.stringify(S)); t.data.wear.photo = ''; t.data.map.own = ''; t.data.map.img = ''; t.data.map.raw = '';
   const url = `${location.origin}${location.pathname}#t=${await squeeze(t)}`;
   overlay(`<p class="eyebrow">Team link · ${esc(S.data.event.team)}</p><p style="margin:0">Open this link on any phone or computer and the team is there, schedule and all. Anyone you send it to gets a copy, so share it with co-coaches only.</p>
     <textarea readonly id="linkOut" style="min-height:96px;font-size:11.5px;word-break:break-all">${esc(url)}</textarea>
@@ -981,7 +1059,10 @@ function scrubImport(t) {
   t.colors = t.colors || {};
   for (const k of ['primary', 'deep', 'accent']) t.colors[k] = hex(t.colors[k]) || ex.colors[k];
   if (!t.data.wear) t.data.wear = ex.data.wear;
-  t.data.wear.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = ''; t.data.map.img = '';
+  t.data.wear.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = ''; t.data.map.img = ''; t.data.map.raw = '';
+  if (Array.isArray(t.data.map.boxes)) t.data.map.boxes = t.data.map.boxes.filter(b => b && [b.x0, b.y0, b.x1, b.y1].every(n => typeof n === 'number' && isFinite(n))).map(b => ({ x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1, label: String(b.label || '').slice(0, 40) }));
+  if (t.data.map.pin && typeof t.data.map.pin === 'object' && !(typeof t.data.map.pin.mx === 'number' && isFinite(t.data.map.pin.mx))) { delete t.data.map.pin.mx; delete t.data.map.pin.my; }
+  if (t.data.map.center && !(typeof t.data.map.center.lat === 'number' && typeof t.data.map.center.lon === 'number')) delete t.data.map.center;
   if (t.data.wear.generic) t.data.wear.generic.color = hex(t.data.wear.generic.color) || t.colors.primary;
   if (typeof t.id !== 'string' || !/^[a-z0-9]{1,16}$/.test(t.id)) delete t.id;
   normalizeTeam(t);
@@ -997,7 +1078,7 @@ async function importFromLink() {
   const i = APP.teams.findIndex(x => x.id && x.id === t.id);
   if (i >= 0) {
     const old = APP.teams[i];
-    t.data.wear.photo = old.data.wear.photo || ''; t.data.map.own = old.data.map.own || ''; t.data.map.img = old.data.map.img || '';
+    t.data.wear.photo = old.data.wear.photo || ''; t.data.map.own = old.data.map.own || ''; t.data.map.img = old.data.map.img || ''; t.data.map.raw = old.data.map.raw || '';
     if (JSON.stringify(old) !== JSON.stringify(t) && !confirm(`Replace ${old.data.event.team} on this device with the copy in the link?`)) return;
     APP.teams[i] = t; APP.ti = i;
   } else {
