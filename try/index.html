@@ -868,10 +868,21 @@ async function teamLink() {
     <div class="send" style="margin-top:10px"><div class="btns"><button class="btn" data-act="copyLink">Copy link</button><a class="btn alt" href="sms:?&body=${encodeURIComponent(url)}" style="text-align:center;text-decoration:none">Text it to me</a></div></div>
     <p class="hint" style="margin-top:10px">The link is a snapshot of the team right now. Change something later and you'd grab a fresh link. Pictures stay on this device.</p>`);
 }
+// colors ride into style="" and pictures into src="" unescaped, so a link only gets to set well-formed ones
+function scrubImport(t) {
+  const hex = v => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)) ? v : null;
+  const ex = preset(['flag', 'basketball', 'soccer', 'wrestling'].includes(t.sport) ? t.sport : 'flag');
+  t.colors = t.colors || {};
+  for (const k of ['primary', 'deep', 'accent']) t.colors[k] = hex(t.colors[k]) || ex.colors[k];
+  if (!t.data.wear) t.data.wear = ex.data.wear;
+  t.data.wear.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = '';
+  if (t.data.wear.generic) t.data.wear.generic.color = hex(t.data.wear.generic.color) || t.colors.primary;
+  if (typeof t.id !== 'string' || !/^[a-z0-9]{1,16}$/.test(t.id)) delete t.id;
+}
 async function importFromLink() {
   const m = location.hash.match(/^#t=([\w-]+)$/); if (!m) return;
   history.replaceState(null, '', location.pathname);
-  let t; try { t = await unsqueeze(m[1]); if (!t || !t.data || !Array.isArray(t.season)) throw 0; }
+  let t; try { t = await unsqueeze(m[1]); if (!t || !t.data || !Array.isArray(t.season)) throw 0; scrubImport(t); }
   catch (e) { overlay('<p class="eyebrow">That link is damaged</p><p style="margin:0">Part of it may have been cut off when it was sent. Ask for it again.</p>'); return; }
   const i = APP.teams.findIndex(x => x.id && x.id === t.id);
   if (i >= 0) {
