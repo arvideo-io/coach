@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Game Day</title>
+<!-- Game Day: single-file static page. Source of truth: GitLab arvideo/gameday, branch prototype/builder-v1. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root { --ground:#e4e9ea; --panel:#ffffff; --ink:#132021; --mute:#5b6b6c; --line:#c9d2d3; --accent:#0b6b74; --accent-ink:#ffffff; --go:#1f9d4c; --soft:#f1f4f4; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ground:#0e1516; --panel:#172123; --ink:#e7eeee; --mute:#93a4a5; --line:#2a383a; --accent:#3fb6c1; --accent-ink:#06282b; --go:#34c759; --soft:#1e2a2c; } }
+  :root[data-theme="dark"] { --ground:#0e1516; --panel:#172123; --ink:#e7eeee; --mute:#93a4a5; --line:#2a383a; --accent:#3fb6c1; --accent-ink:#06282b; --go:#34c759; --soft:#1e2a2c; }
+
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink); font:400 15px/1.45 Inter, system-ui, sans-serif; padding-inline:16px; padding-block:18px 110px; }
+  button, input, select, textarea { font:inherit; color:inherit; }
+  button { cursor:pointer; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .wrap { max-width:1080px; margin:0 auto; }
+  .top { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-bottom:16px; }
+  .top h1 { font:400 30px/1 Anton, Impact, sans-serif; text-transform:uppercase; letter-spacing:.02em; margin:0; }
+  .top p { margin:0; color:var(--mute); font-size:13px; }
+  .eyebrow { font:700 12px/1 'Barlow Condensed', sans-serif; letter-spacing:.18em; text-transform:uppercase; color:var(--mute); margin:0 0 8px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .stack { display:flex; flex-direction:column; gap:14px; }
+
+  /* chiclets (the builder's toggles) */
+  .chips { display:grid; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); gap:8px; }
+  .chip { text-align:left; background:var(--soft); border:1.5px solid var(--line); border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:2px; min-height:58px; }
+  .chip b { font:800 17px/1 'Barlow Condensed', sans-serif; letter-spacing:.06em; text-transform:uppercase; display:flex; align-items:center; gap:7px; }
+  .chip b::before { content:''; width:14px; height:14px; border-radius:4px; border:1.5px solid var(--mute); flex-shrink:0; }
+  .chip small { color:var(--mute); font-size:11.5px; line-height:1.25; }
+  .chip[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .chip[aria-pressed="true"] small { color:inherit; opacity:.8; }
+  .chip[aria-pressed="true"] b::before { background:var(--accent-ink); border-color:var(--accent-ink); }
+  .chip[disabled] { opacity:.75; cursor:default; }
+
+  .seg { display:inline-flex; background:var(--soft); border:1px solid var(--line); border-radius:10px; padding:3px; gap:3px; }
+  .seg button { border:0; background:transparent; border-radius:8px; padding:7px 14px; font:700 15px/1 'Barlow Condensed', sans-serif; letter-spacing:.08em; text-transform:uppercase; }
+  .seg button[aria-pressed="true"] { background:var(--accent); color:var(--accent-ink); }
+
+  /* fields */
+  .grp { border-top:1px solid var(--line); padding-top:12px; }
+  .grp:first-child { border-top:0; padding-top:0; }
+  .grp-h { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .grp-h h3 { margin:0; font:800 18px/1 'Barlow Condensed', sans-serif; letter-spacing:.08em; text-transform:uppercase; }
+  .mv { display:flex; gap:4px; }
+  .mv button, .icon { border:1px solid var(--line); background:var(--soft); border-radius:8px; width:32px; height:30px; line-height:1; }
+  .flds { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
+  .fld { display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .fld.wide { grid-column:1 / -1; }
+  .fld span { font-size:12px; color:var(--mute); }
+  input[type=text], input[type=url], textarea, select { width:100%; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-width:0; }
+  input[type=color] { width:100%; height:36px; border:1px solid var(--line); border-radius:8px; background:var(--panel); padding:2px; }
+  .rows { display:flex; flex-direction:column; gap:6px; grid-column:1 / -1; }
+  .row { display:flex; gap:6px; align-items:center; }
+  .row input[type=text] { flex:1; }
+  .row .e { flex:0 0 52px; text-align:center; }
+  .row .hot { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--mute); white-space:nowrap; }
+  .add { align-self:flex-start; border:1px dashed var(--line); background:transparent; border-radius:8px; padding:6px 12px; color:var(--mute); }
+  .hint { color:var(--mute); font-size:12.5px; margin:0; grid-column:1 / -1; }
+
+  .btn { border:0; border-radius:10px; padding:12px 16px; font:800 17px/1 'Barlow Condensed', sans-serif; letter-spacing:.1em; text-transform:uppercase; background:var(--go); color:#fff; }
+  .btn.alt { background:transparent; color:var(--ink); box-shadow:inset 0 0 0 1.5px var(--line); }
+  .send { display:flex; flex-direction:column; gap:10px; }
+  .send .btns { display:flex; flex-wrap:wrap; gap:8px; }
+  .send .btns .btn { flex:1 1 150px; }
+  .email-pv { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 12px 16px; max-width:444px; margin:0 auto; color:#222; }
+  .pvlab { font:700 12px/1 'Barlow Condensed', sans-serif; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin:0 0 10px 4px; }
+  .email-pv .mail { box-shadow:none; border-radius:22px 22px 0 0; margin-bottom:0; padding-bottom:0; }
+  .email-pv > table { margin:0 auto; }
+  .endmark { display:flex; align-items:center; gap:10px; color:var(--mute); font:700 11px/1 'Barlow Condensed', sans-serif; letter-spacing:.2em; text-transform:uppercase; margin:6px 0 -4px; }
+  .endmark::before, .endmark::after { content:''; flex:1; border-top:1px dashed var(--line); }
+  .sendp { border:2px solid var(--accent); }
+  .steps { list-style:none; margin:4px 0 0; padding:0; display:flex; flex-direction:column; gap:10px; counter-reset:s; }
+  .steps li { display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--soft); border-radius:10px; counter-increment:s; }
+  .steps li::before { content:counter(s); flex-shrink:0; width:28px; height:28px; border-radius:50%; background:var(--accent); color:var(--accent-ink); font:800 15px/28px 'Barlow Condensed', sans-serif; text-align:center; }
+  .steps li > div { flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .steps li b { font-size:14.5px; }
+  .steps li span { color:var(--mute); font-size:12.5px; }
+  .steps li .btn { flex-shrink:0; }
+  @media (max-width:520px) { .steps li { flex-wrap:wrap; } .steps li .btn { width:100%; margin-left:40px; } }
+  .remind { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:13px; color:var(--mute); }
+  .remind select { width:auto; padding:5px 8px; }
+  details.dump summary { cursor:pointer; color:var(--mute); font-size:12.5px; }
+  details.dump pre { max-height:260px; overflow:auto; font-size:11.5px; background:var(--soft); border-radius:8px; padding:10px; margin:8px 0 0; }
+
+  /* A: workbench */
+  .wb { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,440px); gap:24px; align-items:start; }
+  .wb .pv { position:sticky; top:12px; max-height:calc(100vh - 130px); overflow:auto; border-radius:22px; }
+  .tabs { display:none; margin-bottom:12px; }
+  @media (max-width: 899px) {
+    .wb { grid-template-columns:minmax(0,1fr); }
+    .wb .pv { position:static; max-height:none; overflow:visible; }
+    .tabs { display:inline-flex; }
+    .wb[data-tab="build"] .pvcol { display:none; }
+    .wb[data-tab="preview"] .edcol { display:none; }
+  }
+
+  /* B: tap the email */
+  .tap { max-width:440px; margin:0 auto; }
+  .blk { position:relative; cursor:pointer; }
+  .hnd { position:absolute; z-index:5; top:8px; right:8px; display:flex; gap:3px; background:rgba(10,14,15,.82); border-radius:9px; padding:3px; }
+  .blk[data-id="event"] > .hnd { top:74px; }
+  .hnd button { border:0; background:transparent; color:#fff; min-width:30px; height:28px; border-radius:6px; font:700 13px/1 'Barlow Condensed', sans-serif; letter-spacing:.08em; text-transform:uppercase; }
+  .hnd button:hover { background:rgba(255,255,255,.18); }
+  .sheet-bg { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:40; }
+  .sheet { position:fixed; z-index:41; left:0; right:0; bottom:0; max-height:62%; overflow:auto; background:var(--panel); border-radius:18px 18px 0 0; padding:16px 16px calc(90px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -10px 40px rgba(0,0,0,.3); }
+  .sheet > div { max-width:560px; margin:0 auto; }
+
+  /* C: interview */
+  .iv { max-width:620px; margin:0 auto; }
+  .dots { display:flex; gap:5px; margin-bottom:14px; }
+  .dots i { flex:1; height:4px; border-radius:2px; background:var(--line); }
+  .dots i.on { background:var(--accent); }
+  .iv h2 { font:400 30px/1.05 Anton, Impact, sans-serif; text-transform:uppercase; margin:0 0 4px; text-wrap:balance; }
+  .iv .lede { color:var(--mute); margin:0 0 14px; }
+  .nav { display:flex; justify-content:space-between; gap:8px; margin-top:16px; }
+  .sports { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); gap:10px; }
+  .sport { text-align:left; background:var(--soft); border:1.5px solid var(--line); border-radius:12px; padding:14px; }
+  .sport b { display:block; font:400 24px/1 Anton, Impact, sans-serif; text-transform:uppercase; }
+  .sport small { color:var(--mute); }
+  .sport[aria-pressed="true"] { border-color:var(--accent); box-shadow:inset 0 0 0 1.5px var(--accent); }
+  .mini { max-width:420px; margin:16px auto 0; }
+
+  /* home / season / event */
+  .season { max-width:560px; margin:0 auto; }
+  .status { font:800 13px/1 'Barlow Condensed', sans-serif; letter-spacing:.14em; text-transform:uppercase; padding:7px 10px; border-radius:8px; background:var(--soft); color:var(--mute); border:1px solid var(--line); }
+  .status.sent { background:var(--go); color:#fff; border-color:var(--go); }
+  .ttl { font:800 20px/1 'Barlow Condensed', sans-serif; letter-spacing:.06em; text-transform:uppercase; }
+  .ts-list { display:flex; flex-direction:column; gap:8px; }
+  .ts { display:flex; align-items:center; gap:14px; text-align:left; background:var(--soft); border:1.5px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .ts .swatch { flex-shrink:0; width:14px; align-self:stretch; border-radius:4px; background:var(--c); }
+  .ts div { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
+  .ts b { font:400 22px/1 Anton, Impact, sans-serif; text-transform:uppercase; letter-spacing:.02em; }
+  .ts span { font-size:13px; }
+  .ts .mu { color:var(--mute); }
+  .ts .arrow { font-size:28px; color:var(--mute); line-height:1; }
+  .wk-edit .row input[type=text] { flex:1; min-width:0; }
+  .wk-list { display:flex; flex-direction:column; gap:6px; }
+  .wk { display:grid; grid-template-columns:52px 72px 1fr 1fr 70px; gap:8px; align-items:center; text-align:left; background:var(--soft); border:1.5px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13.5px; }
+  .wk b { font:800 16px/1 'Barlow Condensed', sans-serif; letter-spacing:.06em; text-transform:uppercase; }
+  .wk .st { font:700 11px/1 'Barlow Condensed', sans-serif; letter-spacing:.14em; text-transform:uppercase; color:var(--mute); }
+  .wk .mu { color:var(--mute); text-align:right; }
+  .wk.on { border-color:var(--accent); box-shadow:inset 0 0 0 1.5px var(--accent); }
+  .wk.on .st { color:var(--accent); }
+  @media (max-width:520px) { .wk { grid-template-columns:44px 1fr 1fr; } .wk .mu, .wk > span:nth-child(3) { display:none; } }
+
+
+  /* result overlay */
+  .ov { position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.72); display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:20px 16px 100px; }
+  .ov .box { background:var(--panel); border-radius:16px; padding:16px; max-width:460px; width:100%; }
+  .ov img { width:100%; border-radius:8px; border:1px solid var(--line); display:block; margin-top:10px; }
+  .ov textarea { margin-top:10px; min-height:180px; font-size:13px; }
+  #shot { position:fixed; left:-10000px; top:0; width:420px; }
+
+  /* ================= the email (look borrowed from flag-emails/mock.html; single look, not themed) ================= */
+  .mail { --gut:12px; width:100%; max-width:420px; margin:0 auto; background:var(--deep); border-radius:22px; overflow:hidden; box-shadow:0 18px 40px rgba(0,0,0,.28); padding-bottom:var(--gut); color:#fff; font-family:Inter, system-ui, sans-serif; line-height:1.3; }
+  .mail.flat { border-radius:0; box-shadow:none; width:420px; }
+  .banner { display:flex; align-items:center; gap:12px; background:#fff; padding:12px 18px; }
+  .badge { flex-shrink:0; width:44px; height:44px; border-radius:50%; background:var(--primary); color:#fff; font:26px/44px Anton, Impact, sans-serif; text-align:center; text-transform:uppercase; }
+  .banner .org { font:800 12px/1 'Barlow Condensed', sans-serif; letter-spacing:.2em; text-transform:uppercase; color:var(--primary); }
+  .banner .what { font:30px/1 Anton, Impact, sans-serif; text-transform:uppercase; color:#111; margin-top:4px; }
+  .hero { position:relative; overflow:hidden; background:linear-gradient(170deg, var(--primary) 0%, var(--primary) 55%, var(--deep) 100%); padding:26px 22px 22px; }
+  .hero::before, .hero::after { content:''; position:absolute; inset:0; pointer-events:none; }
+  .hero::before { background:repeating-linear-gradient(155deg, rgba(255,255,255,.055) 0 9px, transparent 9px 24px); clip-path:polygon(0 0, 50% 0, 50% 100%, 0 100%); }
+  .hero::after  { background:repeating-linear-gradient(25deg,  rgba(255,255,255,.055) 0 9px, transparent 9px 24px); clip-path:polygon(50% 0, 100% 0, 100% 100%, 50% 100%); }
+  .ghost { position:absolute; right:-14px; top:-38px; font:280px/1 Anton, Impact, sans-serif; color:transparent; -webkit-text-stroke:2px rgba(255,255,255,.14); z-index:0; }
+  .hero > :not(.ghost) { position:relative; z-index:1; }
+  .kick { font:700 13px/1.2 'Barlow Condensed', sans-serif; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); }
+  .title { font:58px/.92 Anton, Impact, sans-serif; text-transform:uppercase; margin:10px 0 0; overflow-wrap:anywhere; }
+  .title .wk { color:var(--accent); }
+  .sub { font:800 25px/1 'Barlow Condensed', sans-serif; letter-spacing:.12em; text-transform:uppercase; margin-top:6px; opacity:.92; }
+  .vs { display:inline-block; margin-top:16px; background:#fff; color:var(--primary); font:32px/1 Anton, Impact, sans-serif; text-transform:uppercase; padding:8px 16px 9px; transform:skewX(-10deg); box-shadow:5px 5px 0 var(--accent); }
+  .vs span { display:inline-block; transform:skewX(10deg); }
+  .vs small { font:800 19px/1 'Barlow Condensed', sans-serif; letter-spacing:.06em; margin-right:6px; opacity:.75; }
+  .times { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-top:18px; }
+  .pill { border:1.5px solid rgba(255,255,255,.35); border-radius:10px; padding:8px 10px; }
+  .pill b { display:block; font:700 11px/1 'Barlow Condensed', sans-serif; letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,.7); }
+  .pill i { display:block; font:normal 26px/1.05 Anton, Impact, sans-serif; margin-top:4px; }
+  .pill.hot { background:#fff; border-color:#fff; color:var(--primary); }
+  .pill.hot b { color:var(--primary); opacity:.7; }
+  .chic { position:relative; margin:var(--gut) var(--gut) 0; border-radius:18px; overflow:hidden; }
+  .label { font:700 12px/1 'Barlow Condensed', sans-serif; letter-spacing:.22em; text-transform:uppercase; }
+  .big { font:40px/.95 Anton, Impact, sans-serif; text-transform:uppercase; }
+  .jersey { min-height:170px; display:flex; align-items:center; }
+  .jersey.has { min-height:250px; }
+  .jersey.dark { background:radial-gradient(120% 90% at 75% 45%, #ffffff 0%, #e4e8e9 45%, #b8c0c2 100%); color:var(--primary); }
+  .jersey.light { background:radial-gradient(110% 90% at 72% 45%, var(--primary) 0%, var(--deep) 80%); color:#fff; }
+  .jersey .txt { position:relative; z-index:2; padding:18px 0 18px 22px; width:100%; }
+  .jersey.has .txt { width:52%; }
+  .jersey .txt .label { opacity:.7; }
+  .jersey .txt .big { margin-top:8px; font-size:44px; }
+  .jersey .tag { display:inline-block; margin-top:12px; font:800 17px/1 'Barlow Condensed', sans-serif; letter-spacing:.14em; text-transform:uppercase; padding:7px 11px; border-radius:8px; }
+  .jersey.dark .tag { background:var(--primary); color:#fff; }
+  .jersey.light .tag { background:#fff; color:var(--primary); }
+  .jersey img { position:absolute; z-index:1; right:10px; top:9px; height:232px; max-width:46%; object-fit:contain; }
+  .jersey .shirt { position:absolute; z-index:1; right:6px; top:50%; transform:translateY(-50%) rotate(4deg); height:230px; width:auto; filter:drop-shadow(0 12px 14px rgba(0,0,0,.3)); }
+  .field { background:#11161a; }
+  .field .hd { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; padding:16px 18px 12px; }
+  .field .hd .label { color:rgba(255,255,255,.6); }
+  .field .hd .big { margin-top:6px; color:#ff2a2a; }
+  .field .addr { text-align:right; font:600 12px/1.35 Inter, sans-serif; color:rgba(255,255,255,.65); white-space:pre-line; }
+  .field img.own { display:block; width:100%; }
+  .fmap { position:relative; height:250px; background:#3c5a33; overflow:hidden; }
+  .fmap div { position:absolute; }
+  .fmap .g2 { left:0; top:0; width:58%; height:52%; background:#47693a; }
+  .fmap .road { left:0; right:0; bottom:0; height:34px; background:#55595c; }
+  .fmap .dash { left:0; right:0; bottom:16px; height:2px; background:linear-gradient(90deg, #d8d29a 0 60%, transparent 60%); background-size:26px 2px; }
+  .fmap .lot { left:8%; bottom:44px; width:50%; height:74px; background:#73777a; border-radius:3px; }
+  .fmap .bays { left:9%; bottom:82px; width:48%; height:32px; background:linear-gradient(90deg, rgba(255,255,255,.55) 0 2px, transparent 2px); background-size:15px 32px; }
+  .fmap .bldg { right:9%; top:30px; width:36%; height:128px; background:#b9b4a8; border-radius:4px; box-shadow:6px 6px 0 rgba(0,0,0,.25); }
+  .fmap .roof { right:13%; top:44px; width:28%; height:60px; background:#a39d90; }
+  .fmap .pin { right:calc(9% + 18% - 15px); top:132px; width:30px; height:30px; border-radius:50% 50% 50% 0; background:#ff2a2a; border:3px solid #fff; transform:rotate(-45deg); }
+  .fmap .plab { right:6%; top:174px; font:800 15px/1 'Barlow Condensed', sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#fff; background:rgba(0,0,0,.6); padding:5px 8px; border-radius:6px; }
+  .fmap .P { left:calc(8% + 8px); bottom:52px; width:30px; height:30px; border-radius:7px; background:#1f6fd1; border:2px solid #fff; font:20px/26px Anton, Impact, sans-serif; text-align:center; }
+  .fmap .samp { left:8px; top:8px; font:600 10.5px/1 Inter, sans-serif; color:#fff; background:rgba(0,0,0,.55); padding:4px 7px; border-radius:5px; }
+  .wx { background:linear-gradient(160deg, #1e6fb8 0%, #0f3f73 100%); padding:16px 18px; }
+  .wx .topr { display:flex; align-items:center; gap:14px; margin-top:10px; }
+  .wx .deg { font:76px/.9 Anton, Impact, sans-serif; }
+  .wx .cond { font:800 22px/1 'Barlow Condensed', sans-serif; letter-spacing:.06em; text-transform:uppercase; }
+  .wx .when { font:600 12px/1.4 Inter, sans-serif; opacity:.8; margin-top:4px; }
+  .wx .stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; margin-top:14px; }
+  .wx .stat { background:rgba(255,255,255,.12); border-radius:10px; padding:8px 6px; text-align:center; }
+  .wx .stat b { display:block; font:700 10px/1 'Barlow Condensed', sans-serif; letter-spacing:.16em; text-transform:uppercase; opacity:.75; }
+  .wx .stat i { display:block; font:normal 20px/1.1 Anton, Impact, sans-serif; margin-top:4px; }
+  .sun { width:54px; height:54px; border-radius:50%; background:#ffd23f; box-shadow:0 0 0 7px rgba(255,210,63,.25); flex-shrink:0; }
+  .bring { background:#f3f1ec; color:#1b1b1b; padding:16px 18px 18px; }
+  .bring .label { color:#8a857a; }
+  .bring .big { color:var(--primary); margin-top:6px; font-size:34px; }
+  .bring .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:14px; }
+  .bring .it { background:#fff; border-radius:12px; padding:12px 6px 10px; text-align:center; box-shadow:0 1px 0 rgba(0,0,0,.06); }
+  .bring .it .e { font-size:30px; line-height:1; }
+  .bring .it b { display:block; margin-top:7px; font:800 14px/1.05 'Barlow Condensed', sans-serif; letter-spacing:.06em; text-transform:uppercase; }
+  .notebk { background:#fff8d6; color:#2a2611; padding:16px 18px 18px; }
+  .notebk .label { color:#8b7d2e; }
+  .notebk .big { font-size:28px; margin-top:6px; color:#2a2611; }
+  .notebk p { margin:10px 0 0; font:500 15px/1.45 Inter, sans-serif; white-space:pre-line; }
+  .linkb { background:rgba(255,255,255,.07); padding:16px 18px 18px; }
+  .linkb .label { color:rgba(255,255,255,.6); }
+  .linkb .vol { font:800 22px/1.1 'Barlow Condensed', sans-serif; letter-spacing:.04em; text-transform:uppercase; margin-top:8px; }
+  .linkb .go { display:block; margin-top:12px; font:600 14px/1.4 Inter, sans-serif; color:var(--accent); overflow-wrap:anywhere; }
+  .qs { background:rgba(255,255,255,.07); padding:16px 18px 6px; }
+  .qs .label { color:rgba(255,255,255,.6); }
+  .qs .big { font-size:28px; margin-top:6px; }
+  .qs .coach { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0; border-top:1px solid rgba(255,255,255,.12); }
+  .qs .coaches { margin-top:12px; }
+  .qs .nm { font:800 19px/1.1 'Barlow Condensed', sans-serif; letter-spacing:.04em; text-transform:uppercase; }
+  .qs .ct { font:500 11.5px/1.45 Inter, sans-serif; color:rgba(255,255,255,.62); margin-top:3px; overflow-wrap:anywhere; }
+  .qs .btns { display:flex; gap:6px; flex-shrink:0; }
+  .qs .b { font:800 14px/1 'Barlow Condensed', sans-serif; letter-spacing:.12em; text-transform:uppercase; text-decoration:none; padding:10px 13px; border-radius:9px; background:#34c759; color:#fff; }
+  .qs .b.alt { background:transparent; box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.45); }
+  .credit { text-align:center; font:600 10.5px/1 Inter, sans-serif; letter-spacing:.04em; color:rgba(255,255,255,.45); padding:12px 0 2px; }
+</style>
+
+<div class="wrap">
+  <div class="top"><h1>Game Day</h1><p>Builds your game-day email. You send it from your own mail.</p></div>
+  <div id="app"></div>
+</div>
+<div id="shot" aria-hidden="true"></div>
+<div id="overlay"></div>
+
+<script>
+const VARIANTS = { D: 'Season (v2)', A: 'Workbench', B: 'Tap the email', C: 'Interview' };
+const BLOCKS = {
+  event:   { name: 'Event',         hint: 'Who, when, where. Always on.', locked: true },
+  times:   { name: 'Times',         hint: 'Any labeled times' },
+  wear:    { name: 'Wear',          hint: 'Uniform for this one' },
+  map:     { name: 'Map',           hint: 'From the address' },
+  weather: { name: 'Weather',       hint: 'Turn off for indoor' },
+  bring:   { name: 'Bring',         hint: 'Packing tiles' },
+  note:    { name: 'Note',          hint: 'Anything else this week' },
+  link:    { name: 'Sign-up link',  hint: 'Sign-ups, tickets, stream' },
+  coach:   { name: 'Coach contact', hint: 'Text and email buttons' },
+};
+const LIST_BLANK = {
+  'data.times.rows':  { label: '', time: '', hot: false },
+  'data.bring.items': { e: '⭐', label: '' },
+  'data.coach.list':  { name: '', phone: '', email: '' },
+};
+
+// a team-season: the template (look, blocks, coaches, bring list) plus its schedule; each event carries its own times
+function preset(sport) {
+  const P = _preset(sport);
+  P.seasonLabel = (sport === 'wrestling' || sport === 'basketball') ? 'Winter 2026-27' : 'Fall 2026';
+  P.season.forEach(w => { w.times = P.data.times.rows.map(r => ({ ...r })); });
+  return P;
+}
+function _preset(sport) {
+  if (sport === 'basketball') return {
+    sport, colors: { primary: '#0b2a5b', deep: '#04101f', accent: '#e0b23c' }, cur: 1,
+    season: [
+      { label: 'Game 1', date: 'Tue · Dec 2', opp: 'Damascus',   home: true,  where: 'Main Gym', venue: 'Poolesville HS', address: 'Poolesville High School\n17501 W Willard Rd\nPoolesville, MD', sent: true },
+      { label: 'Game 2', date: 'Fri · Dec 5', opp: 'Clarksburg', home: false, where: 'Main Gym', venue: 'Clarksburg HS',  address: 'Clarksburg High School\n22500 Wims Rd\nClarksburg, MD' },
+      { label: 'Game 3', date: 'Tue · Dec 9', opp: 'Seneca Valley', home: true, where: 'Main Gym', venue: 'Poolesville HS', address: 'Poolesville High School\n17501 W Willard Rd\nPoolesville, MD' },
+      { label: 'Game 4', date: 'Fri · Dec 12', opp: 'Wootton',   home: false, where: 'Aux Gym',  venue: 'Wootton HS',     address: 'Wootton High School\n2100 Wootton Pkwy\nRockville, MD' },
+    ],
+    order: ['event', 'wear', 'map', 'bring', 'note', 'link', 'weather', 'coach'],
+    on: { event: true, times: true, wear: true, map: true, weather: false, bring: true, note: false, link: true, coach: true },
+    data: {
+      event: { org: 'Poolesville Wildcats · JV Basketball', what: 'Game Day Info', date: 'Fri · Dec 5', venue: 'Clarksburg HS', team: 'Wildcats', accent: 'Game 2', sub: 'Away', ghost: '2', oppLabel: 'AT', opp: 'Clarksburg' },
+      times: { rows: [ { label: 'Bus departs', time: '4:15', hot: false }, { label: 'Warm-up', time: '5:15', hot: false }, { label: 'Tip-off', time: '6:00', hot: true } ] },
+      wear: { label: 'Wear', big: 'Away Jerseys', tag: 'Navy · white shorts', style: 'light', photo: '', generic: { shape: 'tshirt', color: '#0b2a5b', glyph: 'basketball' } },
+      map: { label: 'Play at', big: 'Main Gym', address: 'Clarksburg High School\n22500 Wims Rd\nClarksburg, MD', pin: 'Gym doors', own: '' },
+      weather: {},
+      bring: { items: [ { e: '🏀', label: 'Both jerseys' }, { e: '👟', label: 'Court shoes' }, { e: '💧', label: 'Water' }, { e: '😁', label: 'Mouthguard' }, { e: '🧥', label: 'Warm-ups' }, { e: '🍌', label: 'Snack for the bus' } ] },
+      note: { title: 'Heads up', text: '' },
+      link: { label: 'Helping out', vol: 'Scorebook this week: the Hendersons', button: 'Volunteer sign-up', url: 'https://www.signupgenius.com/' },
+      coach: { list: [ { name: 'Coach Example', phone: '(301) 555-0188', email: 'coach@example.com' } ] },
+    },
+  };
+  if (sport === 'soccer') return {
+    sport, colors: { primary: '#151515', deep: '#000000', accent: '#f5d000' }, cur: 1,
+    season: [
+      { label: 'Week 1', date: 'Sat · Sep 12', opp: '', home: true, where: 'Field 4', sent: true },
+      { label: 'Week 2', date: 'Sat · Sep 19', opp: '', home: true, where: 'Field 4' },
+      { label: 'Week 3', date: 'Sat · Sep 26', opp: '', home: true, where: 'Field 2' },
+      { label: 'Week 4', date: 'Sat · Oct 3',  opp: '', home: true, where: 'Field 4' },
+    ],
+    order: ['event', 'wear', 'map', 'weather', 'bring', 'note', 'link', 'coach'],
+    on: { event: true, times: true, wear: true, map: true, weather: true, bring: true, note: false, link: true, coach: true },
+    data: {
+      event: { org: 'Poolesville Rec Soccer · U6 Girls', what: 'Game Day Info', date: 'Sat · Sep 19', venue: 'Stevens Park', team: 'Yellow Lightning', accent: 'Week 2', sub: 'Soccer', ghost: '2', oppLabel: 'VS.', opp: '' },
+      times: { rows: [ { label: 'Arrive', time: '8:45', hot: false }, { label: 'Game', time: '9:00', hot: true } ] },
+      wear: { label: 'Wear', big: 'Yellow Shirt', tag: 'Shin guards under socks', style: 'dark', photo: '', generic: { shape: 'tshirt', color: '#f5d000', glyph: 'soccer' } },
+      map: { label: "We're on", big: 'Field 4', address: 'Stevens Park\n19900 Fisher Ave\nPoolesville, MD', pin: 'Field 4', own: '' },
+      weather: {},
+      bring: { items: [ { e: '⚽', label: 'Ball' }, { e: '🦵', label: 'Shin guards' }, { e: '💧', label: 'Water' }, { e: '👟', label: 'Cleats' }, { e: '🍊', label: 'Snack' }, { e: '🧴', label: 'Sunscreen' } ] },
+      note: { title: 'Heads up', text: '' },
+      link: { label: 'Helping out', vol: 'Snacks this week: the Hendersons', button: 'Snack sign-up', url: 'https://www.signupgenius.com/' },
+      coach: { list: [ { name: 'Coach Example', phone: '(301) 555-0177', email: 'coach@example.com' } ] },
+    },
+  };
+  if (sport === 'wrestling') return {
+    sport, colors: { primary: '#6b1220', deep: '#23060b', accent: '#e0b23c' }, cur: 1,
+    season: [
+      { label: 'Dual Meet', date: 'Wed · Dec 3', opp: 'Seneca Valley', home: true,  where: 'Main Gym',     venue: 'Northwood HS',  address: 'Northwood High School\n919 University Blvd W\nSilver Spring, MD', sent: true },
+      { label: 'Dual Meet', date: 'Tue · Dec 8', opp: 'Damascus',      home: false, where: 'Gym Entrance', venue: 'Damascus HS Gym', address: 'Damascus High School\n25921 Ridge Rd\nDamascus, MD' },
+      { label: 'Quad Meet', date: 'Sat · Dec 12', opp: '',             home: true,  where: 'Main Gym',     venue: 'Northwood HS',  address: 'Northwood High School\n919 University Blvd W\nSilver Spring, MD' },
+      { label: 'Dual Meet', date: 'Wed · Dec 16', opp: 'Clarksburg',   home: false, where: 'Aux Gym',      venue: 'Clarksburg HS', address: 'Clarksburg High School\n22500 Wims Rd\nClarksburg, MD' },
+    ],
+    order: ['event', 'wear', 'map', 'bring', 'note', 'link', 'weather', 'coach'],
+    on: { event: true, times: true, wear: true, map: true, weather: false, bring: true, note: true, link: true, coach: true },
+    data: {
+      event: { org: 'Northwood High Wrestling', what: 'Meet Day Info', date: 'Tue · Dec 8', venue: 'Damascus HS Gym', team: 'Varsity', accent: 'Dual Meet', sub: 'Away', ghost: 'W', oppLabel: 'AT', opp: 'Damascus' },
+      times: { rows: [ { label: 'Bus departs', time: '3:15', hot: false }, { label: 'Weigh-in', time: '4:30', hot: false }, { label: 'Doors open', time: '5:30', hot: false }, { label: 'First whistle', time: '6:00', hot: true } ] },
+      wear: { label: 'Wear', big: 'Maroon Singlet', tag: 'Team warm-ups on the bus', style: 'light', photo: '', generic: { shape: '', color: '#6b1220', glyph: 'none' } },
+      map: { label: 'Park at', big: 'Gym Entrance', address: 'Damascus High School\n25921 Ridge Rd\nDamascus, MD', pin: 'Gym doors', own: '' },
+      weather: {},
+      bring: { items: [ { e: '🤼', label: 'Singlet' }, { e: '🎧', label: 'Headgear' }, { e: '👟', label: 'Shoes' }, { e: '💧', label: 'Water' }, { e: '😁', label: 'Mouthguard' }, { e: '🍌', label: 'Snack after weigh-in' } ] },
+      note: { title: 'Parents', text: 'JV wrestles first. Varsity starts around 7:00.\nAdmission is $5 at the door, students free.' },
+      link: { label: 'Helping out', vol: 'Concessions this week: the Hendersons', button: 'Sign up for a shift', url: 'https://www.signupgenius.com/' },
+      coach: { list: [ { name: 'Coach Example', phone: '(301) 555-0142', email: 'coach@example.com' } ] },
+    },
+  };
+  return {
+    sport: 'flag', colors: { primary: '#004C54', deep: '#062226', accent: '#A5ACAF' }, cur: 1,
+    season: [
+      { label: 'Week 2', date: 'Sun · Sep 20', opp: 'Panthers',   home: true,  where: 'Field 2', sent: true },
+      { label: 'Week 3', date: 'Sun · Sep 27', opp: 'Commanders', home: true,  where: 'Field 3' },
+      { label: 'Week 4', date: 'Sun · Oct 4',  opp: 'Cowboys',    home: false, where: 'Field 1' },
+      { label: 'Week 5', date: 'Sun · Oct 11', opp: 'Giants',     home: true,  where: 'Field 3' },
+      { label: 'Week 6', date: 'Sun · Oct 18', opp: 'Steelers',   home: false, where: 'Field 2' },
+    ],
+    order: ['event', 'wear', 'map', 'weather', 'bring', 'note', 'link', 'coach'],
+    on: { event: true, times: true, wear: true, map: true, weather: true, bring: true, note: false, link: false, coach: true },
+    data: {
+      event: { org: 'Poolesville Flag Football', what: 'Game Day Info', date: 'Sun · Sep 27', venue: 'EE Halmos Park', team: 'Eagles', accent: 'Week 3', sub: 'Flag Football', ghost: '3', oppLabel: 'VS.', opp: 'Commanders' },
+      times: { rows: [ { label: 'Practice', time: '10:30', hot: false }, { label: 'Game', time: '11:30', hot: true } ] },
+      wear: { label: 'Wear', big: 'Home Jerseys', tag: 'Dark', style: 'dark', photo: '', generic: { shape: 'tshirt', color: '#004C54', glyph: 'football' } },
+      map: { label: "We're on", big: 'Field 3', address: 'EE Halmos Park\n17001 Hoskinson Rd\nPoolesville, MD', pin: 'Field 3', own: '' },
+      weather: {},
+      bring: { items: [ { e: '😁', label: 'Mouthguard' }, { e: '🚩', label: 'Flag belt' }, { e: '💧', label: 'Water' }, { e: '👟', label: 'Cleats' }, { e: '👕', label: 'Jersey' }, { e: '🩳', label: 'Shorts' } ] },
+      note: { title: 'Heads up', text: 'Team photos right after the game. Stick around for ten minutes.' },
+      link: { label: 'Helping out', vol: 'Snacks this week: the Hendersons', button: 'Snack sign-up', url: 'https://www.signupgenius.com/' },
+      coach: { list: [ { name: 'Coach Example', phone: '(301) 555-0199', email: 'coach@example.com' } ] },
+    },
+  };
+}
+
+const EXAMPLES = () => [preset('flag'), preset('basketball'), preset('soccer'), preset('wrestling')];
+const STORE = 'gameday.v1';
+function loadApp() {
+  try { const j = JSON.parse(localStorage.getItem(STORE) || 'null'); if (j && Array.isArray(j.teams) && j.teams.length) return { teams: j.teams, ti: 0, ei: 0, page: 'home', saved: true }; } catch (e) {}
+  return { teams: EXAMPLES(), ti: 0, ei: 0, page: 'home', saved: false };
+}
+function saveApp() { try { localStorage.setItem(STORE, JSON.stringify({ teams: APP.teams })); APP.saved = true; APP.saveFailed = false; } catch (e) { APP.saveFailed = true; } }
+const APP = loadApp();
+let freshDevice = !APP.saved;                     // render() saves, so remember this before the first one
+let S = APP.teams[0];
+const UI = { tab: 'build', editing: null, step: 0, noteOpen: false };
+
+// the weekly touch: one season row becomes the email; everything else is season setup that carries over
+function applyEvent(i) {
+  const r = S.season[i]; if (!r) return; S.cur = i;
+  const e = S.data.event, flag = S.sport === 'flag', weekly = S.sport !== 'wrestling';
+  e.date = r.date; e.opp = r.opp; e.accent = r.label; e.ghost = weekly ? r.label.replace(/\D/g, '') || 'G' : 'W';
+  e.oppLabel = r.home ? 'VS.' : 'AT'; e.sub = flag ? 'Flag Football' : S.sport === 'soccer' ? 'Soccer' : (r.home ? 'Home' : 'Away');
+  if (r.times) S.data.times.rows = r.times;
+  if (r.venue) e.venue = r.venue;
+  if (r.address) S.data.map.address = r.address;
+  S.data.map.big = r.where;
+  if (flag) { S.data.wear.big = r.home ? 'Home Jerseys' : 'Away Jerseys'; S.data.wear.tag = r.home ? 'Dark' : 'White'; S.data.wear.style = r.home ? 'dark' : 'light'; }
+  if (S.sport === 'basketball') { S.data.wear.big = r.home ? 'Home Jerseys' : 'Away Jerseys'; S.data.wear.tag = r.home ? 'White · navy shorts' : 'Navy · white shorts'; S.data.wear.style = r.home ? 'dark' : 'light'; S.data.wear.generic.color = r.home ? '#f4f4f4' : S.colors.primary; }
+  S.on.note = !!(r.note && r.note.trim()); if (r.note) S.data.note = { title: 'Heads up', text: r.note };
+}
+APP.teams.forEach(t => { S = t; applyEvent(t.cur); }); S = APP.teams[0];
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const get = path => path.split('.').reduce((o, k) => (o == null ? o : o[k]), S);
+function set(path, v) { const ks = path.split('.'); const last = ks.pop(); ks.reduce((o, k) => o[k], S)[last] = v; }
+const fid = path => 'f-' + path.replace(/\W+/g, '-');
+
+/* ---------------- the email ---------------- */
+function hotTime() { const r = S.data.times.rows; const h = r.find(x => x.hot) || r[r.length - 1]; return h ? `${h.label} ${h.time}` : ''; }
+
+function blockHTML(id) {
+  const d = S.data, e = d.event;
+  switch (id) {
+    case 'event': return `
+      <div class="banner"><div class="badge">${esc((e.team || '?')[0])}</div><div><div class="org">${esc(e.org)}</div><div class="what">${esc(e.what)}</div></div></div>
+      <div class="hero"><div class="ghost">${esc(e.ghost)}</div>
+        <div class="kick">${esc(e.date)} · ${esc(e.venue)}</div>
+        <div class="title">${esc(e.team)} <span class="wk">${esc(e.accent)}</span></div>
+        ${e.sub ? `<div class="sub">${esc(e.sub)}</div>` : ''}
+        ${e.opp ? `<div class="vs"><span><small>${esc(e.oppLabel)}</small>${esc(e.opp)}</span></div>` : ''}
+        ${S.on.times && d.times.rows.length ? `<div class="times">${d.times.rows.map(r => `<div class="pill${r.hot ? ' hot' : ''}"><b>${esc(r.label)}</b><i>${esc(r.time)}</i></div>`).join('')}</div>` : ''}
+      </div>`;
+    case 'wear': { const w = d.wear, art = w.photo ? `<img src="${w.photo}" alt="">` : shirtSVG(w.generic); return `
+      <div class="chic jersey ${w.style}${art ? ' has' : ''}"><div class="txt"><div class="label">${esc(w.label)}</div><div class="big">${esc(w.big)}</div>${w.tag ? `<div class="tag">${esc(w.tag)}</div>` : ''}</div>${art}</div>`; }
+    case 'map': { const m = d.map; return `
+      <div class="chic field"><div class="hd"><div><div class="label">${esc(m.label)}</div><div class="big">${esc(m.big)}</div></div><div class="addr">${esc(m.address)}</div></div>
+      ${m.own ? `<img class="own" src="${m.own}" alt="">` : `<div class="fmap"><div class="g2"></div><div class="road"></div><div class="dash"></div><div class="lot"></div><div class="bays"></div><div class="bldg"></div><div class="roof"></div><div class="P">P</div><div class="pin"></div><div class="plab">${esc(m.pin)}</div><div class="samp">Sample map. The real one is a satellite photo of this address.</div></div>`}</div>`; }
+    case 'weather': return `
+      <div class="chic wx"><div class="label" style="opacity:.75">Forecast</div>
+        <div class="topr"><div class="sun"></div><div class="deg">64°</div><div><div class="cond">Mostly sunny</div><div class="when">at ${esc(hotTime())}<br>${esc(e.venue)}</div></div></div>
+        <div class="stats"><div class="stat"><b>Feels</b><i>63°</i></div><div class="stat"><b>Rain</b><i>10%</i></div><div class="stat"><b>Wind</b><i>7</i></div><div class="stat"><b>UV</b><i>5</i></div></div></div>`;
+    case 'bring': return `
+      <div class="chic bring"><div class="label">Don't forget</div><div class="big">Bring</div>
+        <div class="grid">${d.bring.items.map(i => `<div class="it"><div class="e">${esc(i.e)}</div><b>${esc(i.label)}</b></div>`).join('')}</div></div>`;
+    case 'note': return `<div class="chic notebk"><div class="label">Coach's note</div><div class="big">${esc(d.note.title)}</div><p>${esc(d.note.text)}</p></div>`;
+    case 'link': return `<div class="chic linkb"><div class="label">${esc(d.link.label)}</div>${d.link.vol ? `<div class="vol">${esc(d.link.vol)}</div>` : ''}<div class="go">${esc(d.link.button)}: ${esc(d.link.url.replace(/^https?:\/\/(www\.)?/, ''))}</div></div>`;
+    case 'coach': return `
+      <div class="chic qs"><div class="label">Questions?</div><div class="big">Reach the coaches</div><div class="coaches">${d.coach.list.map(c => `
+        <div class="coach"><div><div class="nm">${esc(c.name)}</div><div class="ct">${esc(c.phone)}<br>${esc(c.email)}</div></div></div>`).join('')}</div></div>`;
+  }
+  return '';
+}
+// the email is a picture on top and live HTML underneath (as the flag email is): blocks with buttons live in the HTML part
+const TEXT_BLOCKS = ['coach', 'link'];
+const visible = () => S.order.filter(id => S.on[id] && !TEXT_BLOCKS.includes(id));
+
+/* generic shirt: Phosphor Icons (MIT), filled t-shirt + sport marks; the real app adds photographed blank jersey/singlet, tinted per team */
+const SHAPES = { tshirt: 'M247.59,61.22,195.83,33A8,8,0,0,0,192,32H160a8,8,0,0,0-8,8,24,24,0,0,1-48,0,8,8,0,0,0-8-8H64a8,8,0,0,0-3.84,1L8.41,61.22A15.76,15.76,0,0,0,1.82,82.48l19.27,36.81A16.37,16.37,0,0,0,35.67,128H56v80a16,16,0,0,0,16,16H184a16,16,0,0,0,16-16V128h20.34a16.37,16.37,0,0,0,14.58-8.71l19.27-36.81A15.76,15.76,0,0,0,247.59,61.22ZM35.67,112a.62.62,0,0,1-.41-.13L16.09,75.26,56,53.48V112Zm185.07-.14a.55.55,0,0,1-.41.14H200V53.48l39.92,21.78Z' };
+const GLYPHS = { none: '', soccer: 'M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm8,39.38,24.79-17.05a88.41,88.41,0,0,1,36.18,27l-8,26.94c-.2,0-.41.1-.61.17l-22.82,7.41a7.59,7.59,0,0,0-1,.4L136,88.62c0-.2,0-.41,0-.62V64C136,63.79,136,63.58,136,63.38ZM95.24,46.33,120,63.38c0,.2,0,.41,0,.62V88c0,.21,0,.42,0,.62L91.44,108.29a7.59,7.59,0,0,0-1-.4l-22.82-7.41c-.2-.07-.41-.12-.61-.17l-8-26.94A88.41,88.41,0,0,1,95.24,46.33Zm-13,129.09H53.9a87.4,87.4,0,0,1-13.79-43.07l22-16.88a5.77,5.77,0,0,0,.58.22l22.83,7.42a7.83,7.83,0,0,0,.93.22l10.79,31.42c-.15.18-.3.36-.44.55L82.7,174.71A7.8,7.8,0,0,0,82.24,175.42ZM150.69,213a88.16,88.16,0,0,1-45.38,0L95.25,184.6c.13-.16.27-.31.39-.48l14.11-19.42a7.66,7.66,0,0,0,.46-.7h35.58a7.66,7.66,0,0,0,.46.7l14.11,19.42c.12.17.26.32.39.48Zm23.07-37.61a7.8,7.8,0,0,0-.46-.71L159.19,155.3c-.14-.19-.29-.37-.44-.55l10.79-31.42a7.83,7.83,0,0,0,.93-.22l22.83-7.42a5.77,5.77,0,0,0,.58-.22l22,16.88a87.4,87.4,0,0,1-13.79,43.07Z', football: 'M229.06,53.89a32.92,32.92,0,0,0-26.95-26.95c-32.38-5.49-93.39-8-138.27,36.9s-42.39,105.9-36.9,138.27a32.92,32.92,0,0,0,27,26.95A206.58,206.58,0,0,0,88.27,232c32.09,0,72.05-8,103.89-39.84C237.05,147.28,234.55,86.26,229.06,53.89ZM56.56,213.3A16.94,16.94,0,0,1,42.7,199.44a180.27,180.27,0,0,1-2.11-46.9l62.87,62.87A180.27,180.27,0,0,1,56.56,213.3ZM165.64,101.67,151.3,116l6.34,6.34a8,8,0,1,1-11.31,11.3L140,127.31,127.31,140l6.34,6.34a8,8,0,1,1-11.3,11.31L116,151.3l-14.34,14.34a8,8,0,1,1-11.31-11.31L104.7,140l-6.34-6.34a8,8,0,0,1,11.31-11.3l6.34,6.34L128.69,116l-6.34-6.34a8,8,0,0,1,11.3-11.31L140,104.7l14.34-14.34a8,8,0,1,1,11.31,11.31Zm49.77,1.79L152.54,40.59c4.76-.44,9.72-.69,14.91-.69a192,192,0,0,1,32,2.8A16.94,16.94,0,0,1,213.3,56.56,180.27,180.27,0,0,1,215.41,103.46Z', basketball: 'M63.6,46.39a103.48,103.48,0,0,1,52-21.65,4,4,0,0,1,4.45,4V120H95.7A103.77,103.77,0,0,0,63.38,52.44,4,4,0,0,1,63.6,46.39ZM46,64.07a103.51,103.51,0,0,0-21.29,51.46,4,4,0,0,0,4,4.47H79.63A87.86,87.86,0,0,0,51.89,63.59,4,4,0,0,0,46,64.07ZM192.4,46.39a103.48,103.48,0,0,0-52-21.65,4,4,0,0,0-4.45,4V120h24.3a103.77,103.77,0,0,1,32.32-67.56A4,4,0,0,0,192.4,46.39Zm38.86,69.14A103.51,103.51,0,0,0,210,64.07a4,4,0,0,0-5.86-.48A87.86,87.86,0,0,0,176.37,120h50.91A4,4,0,0,0,231.26,115.53ZM24.74,140.47A103.51,103.51,0,0,0,46,191.93a4,4,0,0,0,5.86.48A87.86,87.86,0,0,0,79.63,136H28.72A4,4,0,0,0,24.74,140.47ZM210,191.93a103.51,103.51,0,0,0,21.29-51.46,4,4,0,0,0-4-4.47H176.37a87.86,87.86,0,0,0,27.74,56.41A4,4,0,0,0,210,191.93ZM63.6,209.61a103.48,103.48,0,0,0,52,21.65,4,4,0,0,0,4.45-4V136H95.7a103.77,103.77,0,0,1-32.32,67.56A4,4,0,0,0,63.6,209.61ZM160.3,136H136v91.28a4,4,0,0,0,4.45,4,103.48,103.48,0,0,0,52-21.65,4,4,0,0,0,.22-6.05A103.77,103.77,0,0,1,160.3,136Z' };
+function shirtSVG(g) {
+  if (!g || !SHAPES[g.shape]) return '';
+  const n = parseInt(g.color.slice(1), 16), lum = .299 * (n >> 16) + .587 * ((n >> 8) & 255) + .114 * (n & 255);
+  const ink = lum > 140 ? '#111' : '#fff';
+  const mark = GLYPHS[g.glyph] ? `<g transform="translate(88 122) scale(.31)">${g.glyph === 'soccer' ? '<circle cx="128" cy="128" r="104" fill="#fff"/>' : ''}<path d="${GLYPHS[g.glyph]}" fill="${g.glyph === 'soccer' ? '#111' : ink}"/></g>` : '';
+  return `<svg class="shirt" viewBox="0 0 256 256" aria-hidden="true"><path d="${SHAPES[g.shape]}" fill="${g.color}"/>${mark}</svg>`;
+}
+
+function footerLines() {
+  const d = S.data, e = d.event, L = [];
+  const tit = `${e.team} ${e.accent}${e.opp ? ` ${e.oppLabel} ${e.opp}` : ''}`.toUpperCase();
+  L.push({ b: tit, t: ` · ${e.date} · ${e.venue}` });
+  if (S.on.times) L.push({ t: d.times.rows.map(r => `${r.label} ${r.time}`).join(' · ') });
+  if (S.on.map) L.push({ a: `Directions to ${e.venue}`, href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.map.address.replace(/\n/g, ', '))}` });
+  if (S.on.link) L.push({ t: d.link.vol ? `${d.link.vol} · ` : '', a: d.link.button, href: d.link.url });
+  if (S.on.coach) d.coach.list.forEach(c => L.push({ t: `Questions? ${c.name} · `, a: c.phone, href: `sms:${c.phone.replace(/\D/g, '')}`, t2: ' · ', a2: c.email, href2: `mailto:${c.email}` }));
+  return L;
+}
+// the live-HTML bottom of the email, ported from flag-emails build_email.py coaches_html(): same font stack, weights,
+// bulletproof table-cell buttons, bgcolor attributes and explicit left alignment that survived Gmail, iOS Mail and Outlook there
+function mixHex(a, b, t) { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16); const ch = sh => Math.round(((A >> sh) & 255) * (1 - t) + ((B >> sh) & 255) * t); return '#' + [16, 8, 0].map(sh => ch(sh).toString(16).padStart(2, '0')).join(''); }
+function footerHTML(flat) {
+  const d = S.data, e = d.event, deep = S.colors.deep, card = mixHex(deep, '#ffffff', .07), rule = mixHex(deep, '#ffffff', .2);
+  const font = "-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif";
+  const cell = `font-family:${font};font-size:13px;font-weight:800;letter-spacing:1.5px;border-radius:9px;`, link = 'color:#ffffff;text-decoration:none;display:block;';
+  const fill = (href, t) => `<td bgcolor="#34c759" style="${cell}background:#34c759;padding:10px 14px;"><a href="${esc(href)}" style="${link}"><span style="color:#ffffff;">${esc(t)}</span></a></td>`;
+  const ghost = (href, t) => `<td style="${cell}border:2px solid #7f8a91;padding:8px 12px;"><a href="${esc(href)}" style="${link}"><span style="color:#ffffff;">${esc(t)}</span></a></td>`;
+  const gap = '<td width="6" style="font-size:0;line-height:0;">&nbsp;</td>';
+  const buttons = (cells, align) => `<table role="presentation" cellpadding="0" cellspacing="0" align="${align}"><tr>${cells.join(gap)}</tr></table>`;
+  const muted = (href, t) => `<a href="${esc(href)}" style="color:#b9c0c7;text-decoration:none;"><span style="color:#b9c0c7;">${esc(t)}</span></a>`;
+  const head = (lab, big) => `<tr><td align="left" style="padding:16px 18px 4px;font-family:${font};text-align:left;"><div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#9aa3aa;">${esc(lab.toUpperCase())}</div><div style="font-size:24px;font-weight:900;color:#ffffff;margin-top:4px;">${esc(big.toUpperCase())}</div></td></tr>`;
+  const cardT = inner => `<tr><td style="padding:0 12px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${card}" style="background:${card};border-radius:18px;">${inner}</table></td></tr>`;
+  let h = '';
+  if (S.on.map || S.on.link) {
+    const b = [];
+    if (S.on.map) b.push(fill(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.map.address.replace(/\n/g, ', '))}`, 'DIRECTIONS'));
+    if (S.on.link) b.push(ghost(d.link.url, d.link.button.toUpperCase()));
+    const sub = S.on.map ? `<div style="font-size:12px;line-height:18px;margin-top:2px;color:#b9c0c7;">${esc(d.map.address.replace(/\n/g, ' · '))}</div>` : '';
+    const vol = S.on.link && d.link.vol ? `<div style="font-size:14px;font-weight:700;line-height:20px;margin-top:8px;color:#ffffff;">${esc(d.link.vol)}</div>` : '';
+    h += cardT(head(S.on.map ? 'Get there' : d.link.label, S.on.map ? e.venue : d.link.button) + `<tr><td align="left" style="padding:0 18px 16px;font-family:${font};color:#ffffff;text-align:left;">${sub}${vol}<div style="margin-top:12px;">${buttons(b, 'left')}</div></td></tr>`);
+  }
+  if (S.on.coach) {
+    const rows = d.coach.list.map((c, i) => `<tr><td align="left" style="padding:12px 0;text-align:left;${i ? `border-top:1px solid ${rule};` : ''}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td align="left" style="font-family:${font};color:#ffffff;vertical-align:middle;text-align:left;"><div style="font-size:17px;font-weight:800;letter-spacing:.5px;">${esc(c.name.toUpperCase())}</div><div style="font-size:12px;line-height:18px;margin-top:2px;">${muted(`sms:${c.phone.replace(/\D/g, '')}`, c.phone)}<br>${muted(`mailto:${c.email}`, c.email)}</div></td>
+      <td align="right" style="vertical-align:middle;white-space:nowrap;">${buttons([fill(`sms:${c.phone.replace(/\D/g, '')}`, 'TEXT'), ghost(`mailto:${c.email}`, 'EMAIL')], 'right')}</td></tr></table></td></tr>`).join('');
+    h += cardT(head('Questions?', 'Text or email the coaches') + `<tr><td style="padding:4px 18px 6px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>`);
+  }
+  const tit = `${e.team} ${e.accent}${e.opp ? ` ${e.oppLabel} ${e.opp}` : ''} · ${e.date}${S.on.times ? ' · ' + d.times.rows.map(r => `${r.label} ${r.time}`).join(' · ') : ''}`;
+  h += `<tr><td align="center" style="padding:2px 12px 14px;font-family:${font};font-size:11px;line-height:16px;color:#9aa3aa;text-align:center;">${esc(tit)}<br>Made with Game Day · coach.arvideo.io</td></tr>`;
+  return `<table role="presentation" width="420" cellpadding="0" cellspacing="0" bgcolor="${deep}" style="width:420px;max-width:100%;background:${deep};table-layout:fixed;${flat ? '' : 'border-radius:0 0 22px 22px;'}">${h}</table>`;
+}
+
+function mailHTML({ flat = false, handles = false, only = null } = {}) {
+  const ids = only ? (only === 'times' ? ['event'] : [only]) : visible();
+  const body = ids.map(id => {
+    const h = blockHTML(id);
+    if (!handles) return h;
+    const lock = BLOCKS[id].locked;
+    return `<div class="blk" data-id="${id}">${h}<div class="hnd"><button data-act="edit" data-id="${id}">Edit</button>${lock ? '' : `<button data-act="up" data-id="${id}" aria-label="Move up">&uarr;</button><button data-act="down" data-id="${id}" aria-label="Move down">&darr;</button><button data-act="toggle" data-id="${id}" aria-label="Remove">&times;</button>`}</div></div>`;
+  }).join('');
+  return `<div class="mail${flat ? ' flat' : ''}" style="--primary:${S.colors.primary};--deep:${S.colors.deep};--accent:${S.colors.accent}">${body}</div>`;
+}
+
+// the plain-text form of the footer, for mail apps that paste text: the links are spelled out
+function textBlock() {
+  return footerLines().map(l => `${l.b || ''}${l.t || ''}${l.a ? (l.href.startsWith('http') ? `${l.a}: ${l.href}` : l.a) : ''}${l.t2 || ''}${l.a2 || ''}`).join('\n');
+}
+
+/* ---------------- editors (only for blocks that are on: the chiclets drive the questions) ---------------- */
+const F = (path, label, o = {}) => `<label class="fld${o.wide ? ' wide' : ''}" for="${fid(path)}"><span>${label}</span>${
+  o.area ? `<textarea id="${fid(path)}" data-path="${path}" rows="3">${esc(get(path))}</textarea>`
+         : `<input id="${fid(path)}" type="${o.type || 'text'}" data-path="${path}" value="${esc(get(path))}">`}</label>`;
+const FILE = (path, label, sfx = '') => `<label class="fld wide" for="${fid(path) + sfx}"><span>${label}</span><input id="${fid(path) + sfx}" type="file" accept="image/*" data-file="${path}">${get(path) ? `<button class="add" data-act="clear" data-path="${path}">Remove image</button>` : ''}</label>`;
+function LIST(path, cols, addLabel) {
+  return `<div class="rows">${get(path).map((r, i) => `<div class="row">${cols.map(c => c.check
+    ? `<label class="hot"><input type="checkbox" id="${fid(`${path}.${i}.${c.k}`)}" data-path="${path}.${i}.${c.k}" ${r[c.k] ? 'checked' : ''}>${c.label}</label>`
+    : `<input type="text" class="${c.cls || ''}" id="${fid(`${path}.${i}.${c.k}`)}" data-path="${path}.${i}.${c.k}" value="${esc(r[c.k])}" placeholder="${c.label}" aria-label="${c.label}">`).join('')}
+    <button class="icon" data-act="del" data-path="${path}" data-i="${i}" aria-label="Remove row">&times;</button></div>`).join('')}
+    <button class="add" data-act="add" data-path="${path}">+ ${addLabel}</button></div>`;
+}
+function fieldsFor(id) {
+  switch (id) {
+    case 'event': return F('data.event.org', 'League or school') + F('data.event.what', 'Banner line') + F('data.event.team', 'Team') + F('data.event.accent', 'Week or event type') + F('data.event.sub', 'Small line under the title') + F('data.event.date', 'Date') + F('data.event.venue', 'Venue name') + F('data.event.oppLabel', 'VS. / AT') + F('data.event.opp', 'Opponent (blank for a tournament)') + F('data.event.ghost', 'Big ghost character');
+    case 'times': return LIST('data.times.rows', [{ k: 'label', label: 'What' }, { k: 'time', label: 'Time' }, { k: 'hot', label: 'main', check: true }], 'Add a time');
+    case 'wear': { const g = get('data.wear.generic') || {}; const sel = (path, label, opts) => `<label class="fld" for="${fid(path)}"><span>${label}</span><select id="${fid(path)}" data-path="${path}">${opts.map(([v, n]) => `<option value="${v}"${get(path) === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
+      return F('data.wear.big', 'What to wear') + F('data.wear.tag', 'Tag under it') + sel('data.wear.style', 'Card style', [['dark', 'Light card (dark uniform)'], ['light', 'Team-color card (light uniform)']])
+      + `<p class="hint"><b>Shirt picture.</b> No photo handy, or the only photo has a kid in it? Pick a generic shirt. The photo option needs a flat shot of just the shirt; the app cuts out the background.</p>`
+      + sel('data.wear.generic.shape', 'Generic shirt', [['tshirt', 'T-shirt'], ['', 'None']]) + F('data.wear.generic.color', 'Shirt color', { type: 'color' }) + sel('data.wear.generic.glyph', 'Mark on it', [['none', 'None'], ['soccer', 'Soccer ball'], ['football', 'Football'], ['basketball', 'Basketball']])
+      + FILE('data.wear.photo', 'Or a photo of the shirt (replaces the generic one)'); }
+    case 'map': return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.pin', 'Pin label') + F('data.map.address', 'Address. The real app finds this on a satellite map and lets you nudge the pin.', { area: true, wide: true }) + FILE('data.map.own', 'Or upload your own parking diagram');
+    case 'weather': return `<p class="hint">Nothing to fill in. The forecast for the main time at the venue address is added when the email is built.</p>`;
+    case 'bring': return LIST('data.bring.items', [{ k: 'e', label: 'Icon', cls: 'e' }, { k: 'label', label: 'Item' }], 'Add an item');
+    case 'note': return F('data.note.title', 'Heading') + F('data.note.text', 'Note', { area: true, wide: true });
+    case 'link': return F('data.link.label', 'Small label') + F('data.link.vol', 'This week (typed by you)', { wide: true }) + F('data.link.button', 'Button text') + F('data.link.url', 'Link', { type: 'url' });
+    case 'coach': return LIST('data.coach.list', [{ k: 'name', label: 'Name' }, { k: 'phone', label: 'Phone' }, { k: 'email', label: 'Email' }], 'Add a coach');
+  }
+  return '';
+}
+const teamFields = () => `<div class="flds">${FILE('data.wear.photo', 'Upload a photo of the jersey and the colors are pulled from it', '-team')}${F('colors.primary', 'Team color', { type: 'color' })}${F('colors.deep', 'Dark background', { type: 'color' })}${F('colors.accent', 'Accent', { type: 'color' })}<p class="hint">${S.colorway ? `Looks like <b>${esc(S.colorway)}</b>. ` : ''}The three swatches are only there if you want to override what the photo gave you.</p></div>`;
+const presetSeg = () => `<div class="seg" role="group" aria-label="Sport preset">${[['flag', 'Flag football'], ['wrestling', 'Wrestling']].map(([k, n]) => `<button data-act="preset" data-id="${k}" aria-pressed="${S.sport === k}">${n}</button>`).join('')}</div>`;
+const chips = () => `<div class="chips">${Object.entries(BLOCKS).map(([id, b]) => `<button class="chip" data-act="toggle" data-id="${id}" aria-pressed="${!!S.on[id]}"${b.locked ? ' disabled' : ''}><b>${b.name}</b><small>${b.hint}</small></button>`).join('')}</div>`;
+const sendPanel = () => `<div class="panel send sendp"><p class="eyebrow">Send it</p>
+  <p class="hint" style="margin:0 0 4px">Game Day builds the email. Your own mail app sends it, so it comes from you.</p>
+  <ol class="steps">
+    <li><div><b>Open Gmail (or Mail) and start a new message to your parent group.</b><span>The group is a one-time setup in your contacts. After that you type its name in To.</span></div></li>
+    <li><div><b>Copy the email, paste it in, send.</b><span>Picture and buttons together.</span></div><button class="btn" data-act="copyPic">Copy the email</button></li>
+  </ol>
+  <div class="remind"><label for="remDays">Remind me by email</label><select id="remDays"><option>1 day before</option><option selected>2 days before</option><option>3 days before</option><option>a week before</option></select><label for="remAt">at</label><select id="remAt"><option>8:00 am</option><option selected>12:00 pm</option><option>5:00 pm</option></select></div>
+  <details class="dump"><summary>What the app would store for this team</summary><pre id="dump"></pre></details></div>`;
+
+/* ---------------- variants ---------------- */
+function groupHTML(id) {
+  const lock = BLOCKS[id].locked || id === 'times';
+  return `<div class="grp"><div class="grp-h"><h3>${BLOCKS[id].name}</h3>${lock ? '' : `<div class="mv"><button data-act="up" data-id="${id}" aria-label="Move ${BLOCKS[id].name} up">&uarr;</button><button data-act="down" data-id="${id}" aria-label="Move ${BLOCKS[id].name} down">&darr;</button></div>`}</div><div class="flds">${fieldsFor(id)}</div></div>`;
+}
+function editorOrder() { const ids = visible(); const out = []; ids.forEach(id => { out.push(id); if (id === 'event' && S.on.times) out.push('times'); }); return out; }
+
+function VariantA() {
+  return `<div class="seg tabs" role="group" aria-label="View">${['build', 'preview'].map(t => `<button data-act="tab" data-id="${t}" aria-pressed="${UI.tab === t}">${t}</button>`).join('')}</div>
+  <div class="wb" data-tab="${UI.tab}">
+    <div class="edcol stack">
+      ${schedulePanel()}
+      <div class="panel stack"><div><p class="eyebrow">What goes in the email</p>${chips()}</div><div><p class="eyebrow">Team colors</p>${teamFields()}</div></div>
+      <div class="panel stack">${editorOrder().map(groupHTML).join('')}</div>
+    </div>
+    <div class="pvcol stack"><div class="pv mailhost"></div>${sendPanel()}</div>
+  </div>`;
+}
+function VariantB() {
+  const off = Object.keys(BLOCKS).filter(id => !S.on[id]);
+  return `<div class="tap stack">
+    <div class="panel stack"><div><p class="eyebrow">Start from</p>${presetSeg()}</div><p class="hint">Tap any part of the email to change it. ${S.on.times ? '' : ''}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px"><button class="add" data-act="edit" data-id="_team">Team colors</button>${S.on.times ? '<button class="add" data-act="edit" data-id="times">Edit times</button>' : ''}</div></div>
+    <div class="mailhost" data-handles="1"></div>
+    ${off.length ? `<div class="panel"><p class="eyebrow">Add to this email</p><div class="chips">${off.map(id => `<button class="chip" data-act="toggle" data-id="${id}" aria-pressed="false"><b>${BLOCKS[id].name}</b><small>${BLOCKS[id].hint}</small></button>`).join('')}</div></div>` : ''}
+    ${sendPanel()}
+  </div>
+  ${UI.editing ? `<div class="sheet-bg" data-act="closeSheet"></div><div class="sheet" role="dialog" aria-label="Edit"><div class="stack">
+      <div class="grp-h"><h3 style="margin:0;font:800 20px/1 'Barlow Condensed',sans-serif;letter-spacing:.08em;text-transform:uppercase">${UI.editing === '_team' ? 'Team colors' : BLOCKS[UI.editing].name}</h3><button class="btn" data-act="closeSheet">Done</button></div>
+      ${UI.editing === '_team' ? teamFields() : `<div class="flds">${fieldsFor(UI.editing)}</div>`}</div></div>` : ''}`;
+}
+const wkList = () => `<div class="wk-list">${S.season.map((w, i) => `<button class="wk${i === S.cur ? ' on' : ''}" data-act="openEvent" data-id="${i}"><span class="st">${w.sent ? 'Sent' : i === S.cur ? 'Next' : ''}</span><b>${esc(w.label)}</b><span>${esc(w.date)}</span><span>${w.opp ? (w.home ? 'vs ' : 'at ') + esc(w.opp) : 'Tournament'}</span><span class="mu">${esc(w.where)}</span></button>`).join('')}</div>`;
+/* ---------------- pages: home → season → event; season → template setup; home → new team-season ---------------- */
+const hdr = (back, backLabel, sub, title, extra = '') => `<div class="panel" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${back ? `<button class="btn alt" data-act="go" data-id="${back}">&larr; ${backLabel}</button>` : ''}<div><p class="eyebrow" style="margin:0 0 4px">${sub}</p><b class="ttl">${title}</b></div></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">${extra}</div></div>`;
+
+function PageHome() {
+  return `<div class="season stack"><div class="panel"><p class="eyebrow">Your teams</p>
+    <div class="ts-list">${APP.teams.map((t, i) => { const sent = t.season.filter(w => w.sent).length; return `<button class="ts" data-act="openTeam" data-id="${i}" style="--c:${t.colors.primary}"><span class="swatch"></span><div><b>${esc(t.data.event.team)}</b><span>${esc(t.data.event.org)}</span><span class="mu">${esc(t.seasonLabel)} · ${sent} of ${t.season.length} sent</span></div><span class="arrow">&rsaquo;</span></button>`; }).join('')}</div>
+    <button class="btn alt" data-act="go" data-id="new" style="margin-top:12px;width:100%">+ Add a team-season</button>
+    <p class="hint" style="margin-top:12px">${APP.saveFailed ? 'This browser is not saving changes (private window or storage blocked). Everything still works for this visit.' : 'Saved in this browser. To use a team on another phone or computer, open it and tap Team link.'} <button class="add" data-act="reset" style="padding:2px 8px;font-size:12px">Start over with the examples</button></p></div></div>`;
+}
+function PageNew() {
+  return `<div class="season stack">${hdr('home', 'Home', 'New team-season', 'Start from')}
+    <div class="panel"><div class="sports">${APP.teams.map((t, i) => `<button class="sport" data-act="newFrom" data-id="t${i}"><b>${esc(t.data.event.team)}</b><small>Copy of ${esc(t.seasonLabel)}: same look, blocks, coaches and bring list. New schedule.</small></button>`).join('')}
+      <button class="sport" data-act="newFrom" data-id="flag"><b>Flag football</b><small>Fresh, from the preset</small></button><button class="sport" data-act="newFrom" data-id="soccer"><b>Rec soccer</b><small>Fresh. Colored tees, no team names.</small></button><button class="sport" data-act="newFrom" data-id="basketball"><b>Basketball</b><small>Fresh. Home and away kits.</small></button><button class="sport" data-act="newFrom" data-id="wrestling"><b>Wrestling</b><small>Fresh, from the preset</small></button></div></div></div>`;
+}
+const wkEdit = () => `<div class="rows wk-edit">${S.season.map((w, i) => `<div class="row"><input type="text" data-path="season.${i}.label" value="${esc(w.label)}" placeholder="Week / type" aria-label="Label" style="flex:0 0 84px"><input type="text" data-path="season.${i}.date" value="${esc(w.date)}" placeholder="Date" aria-label="Date"><input type="text" data-path="season.${i}.opp" value="${esc(w.opp)}" placeholder="Opponent" aria-label="Opponent"><input type="text" data-path="season.${i}.where" value="${esc(w.where)}" placeholder="Where" aria-label="Where"><button class="icon" data-act="delEvent" data-id="${i}" aria-label="Remove event">&times;</button></div>`).join('')}</div>`;
+function schedulePanel() {
+  return `<div class="panel stack"><div><p class="eyebrow">Schedule</p><div class="flds">${F('seasonLabel', 'Season name')}</div><div style="margin-top:10px">${wkEdit()}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="add" data-act="addEvent">+ Add an event</button><label class="add" style="cursor:pointer">Import schedule (.xlsx / .csv)<input type="file" accept=".xlsx,.xls,.csv" data-import="schedule" hidden></label></div>
+      <p class="hint">Import reads the date, opponent, home/away and location columns. In this prototype it adds sample rows.</p></div>
+    <div><p class="eyebrow">Parent email list</p><label class="add" style="cursor:pointer">Import email list (.xlsx / .csv)<input type="file" accept=".xlsx,.xls,.csv" data-import="emails" hidden></label>
+      <p class="hint">Only needed for league auto-send. With Copy, keep the list as a contact group in your own mail app.</p></div></div>`;
+}
+function PageSetup() {
+  const fresh = !S.season.length;
+  return `<div class="stack">${hdr(fresh ? 'home' : 'season', fresh ? 'Home' : 'Season', 'Template setup, once a season', `${esc(S.data.event.team)} · ${esc(S.seasonLabel)}`, `<button class="btn" data-act="go" data-id="season">Done</button>`)}
+    <p class="hint">Everything here carries into every event of the season. Each event only asks for what changes.</p>${VariantA()}</div>`;
+}
+function PageSeason() {
+  const next = S.season.findIndex(w => !w.sent); if (next >= 0) applyEvent(next);
+  const e = S.data.event, r = S.season[next];
+  return `<div class="season stack">${hdr('home', 'Home', esc(e.org), `${esc(e.team)} · ${esc(S.seasonLabel)}`, `<button class="add" data-act="teamLink">Team link</button><button class="add" data-act="go" data-id="setup">Edit template</button><button class="add" data-act="delTeam" title="Delete this team-season">&times;</button>`)}
+    <div class="panel"><p class="eyebrow">Schedule</p>${wkList()}<p class="hint" style="margin-top:8px">Tap an event to change it. Copying its email marks it sent.</p></div>
+    ${next >= 0 ? `<div class="panel" style="padding:10px 14px"><p class="eyebrow" style="margin:0">Next up · ${esc(r.label)} · ${esc(r.date)}</p></div><div class="mailhost"></div>${sendPanel()}` : `<div class="panel"><p class="eyebrow">Season complete</p><p class="hint">Every event has been sent.</p></div>`}
+  </div>`;
+}
+function PageEvent() {
+  const i = APP.ei; applyEvent(i); const r = S.season[i], p = `season.${i}.`;
+  return `<div class="season stack">${hdr('season', 'Season', esc(S.data.event.team), `${esc(r.label)} · ${esc(r.date)}`, `<span class="status${r.sent ? ' sent' : ''}">${r.sent ? 'Sent' : 'Ready to send'}</span>`)}
+    <div class="panel"><p class="eyebrow">This event</p>
+      <div class="flds">${F(p + 'label', 'Week or type')}${F(p + 'date', 'Date')}${F(p + 'opp', 'Opponent (blank for a tournament)')}
+        <div class="fld"><span>Home or away</span><div class="seg"><button data-act="homeaway" data-id="1" aria-pressed="${!!r.home}">Home</button><button data-act="homeaway" data-id="0" aria-pressed="${!r.home}">Away</button></div></div>
+        ${F(p + 'where', S.sport === 'flag' ? 'Field' : 'Where in the building')}
+        ${S.sport === 'flag' ? '' : F(p + 'venue', 'Venue') + F(p + 'address', 'Address', { area: true, wide: true })}
+        <div class="fld wide"><span>Times</span>${LIST(p + 'times', [{ k: 'label', label: 'What' }, { k: 'time', label: 'Time' }, { k: 'hot', label: 'main', check: true }], 'Add a time')}</div>
+        ${UI.noteOpen || r.note ? F(p + 'note', 'Note for this event', { area: true, wide: true }) : `<button class="add" data-act="noteOpen">+ Add a note for this event</button>`}
+      </div></div>
+    <div class="mailhost"></div>
+    ${sendPanel()}
+  </div>`;
+}
+function ivSteps() { return ['_sport', '_blocks', ...editorOrder(), '_done']; }
+function VariantC() {
+  const steps = ivSteps(); UI.step = Math.min(UI.step, steps.length - 1); const st = steps[UI.step];
+  let body;
+  if (st === '_sport') body = `<h2>What do you coach?</h2><p class="lede">This only picks a starting point. Everything can be changed.</p>
+    <div class="sports">${[['flag', 'Flag football', 'Outdoor, weekly games, one park'], ['wrestling', 'Wrestling', 'Indoor, away gyms, weigh-ins and buses']].map(([k, n, s]) => `<button class="sport" data-act="preset" data-id="${k}" aria-pressed="${S.sport === k}"><b>${n}</b><small>${s}</small></button>`).join('')}</div>
+    <div style="margin-top:16px"><p class="eyebrow">Team colors</p>${teamFields()}</div>`;
+  else if (st === '_blocks') body = `<h2>What do parents need to know?</h2><p class="lede">You will only be asked about the ones you pick.</p>${chips()}`;
+  else if (st === '_done') body = `<h2>That's the email</h2><p class="lede">Next week opens pre-filled with these answers.</p><div class="mailhost"></div><div style="margin-top:16px">${sendPanel()}</div>`;
+  else body = `<h2>${BLOCKS[st].name}</h2><p class="lede">${BLOCKS[st].hint}</p><div class="panel"><div class="flds">${fieldsFor(st)}</div></div><div class="mini mailhost" data-only="${st}"></div>`;
+  return `<div class="iv"><div class="dots">${steps.map((_, i) => `<i class="${i <= UI.step ? 'on' : ''}"></i>`).join('')}</div>${body}
+    <div class="nav"><button class="btn alt" data-act="step" data-id="-1"${UI.step === 0 ? ' disabled style="opacity:.4"' : ''}>Back</button>${st === '_done' ? '' : `<button class="btn" data-act="step" data-id="1">${UI.step === steps.length - 2 ? 'See the email' : 'Next'}</button>`}</div></div>`;
+}
+
+/* ---------------- render ---------------- */
+function renderPreviews() {
+  document.querySelectorAll('.mailhost').forEach(h => {
+    const only = h.dataset.only || null;
+    if (only && TEXT_BLOCKS.includes(only)) { h.innerHTML = `<div class="email-pv"><div class="pvlab">Text part of the email</div>${footerHTML()}</div>`; return; }
+    h.innerHTML = only ? mailHTML({ handles: !!h.dataset.handles, only }) : `<div class="email-pv"><div class="pvlab">The email, as parents get it</div>${mailHTML({ handles: !!h.dataset.handles })}${footerHTML()}</div>`;
+  });
+  const dump = $('#dump');
+  if (dump) dump.textContent = JSON.stringify(S, (k, v) => (typeof v === 'string' && v.startsWith('data:') ? '[image]' : v), 1);
+}
+function render() {
+  saveApp();
+  S = APP.teams[APP.ti] || APP.teams[0];
+  $('#app').innerHTML = ({ home: PageHome, new: PageNew, setup: PageSetup, season: PageSeason, event: PageEvent }[APP.page] || PageHome)();
+  renderPreviews();
+}
+function go(page) { APP.page = page; UI.editing = null; UI.noteOpen = false; render(); window.scrollTo(0, 0); }
+function newFrom(id) {
+  let t;
+  if (id.startsWith('t')) { t = JSON.parse(JSON.stringify(APP.teams[+id.slice(1)])); delete t.id; t.season = []; t.seasonLabel = 'New season'; t.cur = 0; delete t.data.wear.photo; }
+  else { t = preset(id); t.season = []; t.seasonLabel = 'New season'; }
+  APP.teams.push(t); APP.ti = APP.teams.length - 1; go('setup');
+}
+function addEvent(rows) {
+  const last = S.season[S.season.length - 1];
+  (rows || [{}]).forEach((r, k) => S.season.push({ label: S.sport === 'flag' ? `Week ${S.season.length + 1}` : 'Dual Meet', date: '', opp: '', home: true, where: last ? last.where : '', venue: last && last.venue, address: last && last.address, ...r, times: S.data.times.rows.map(x => ({ ...x })) }));
+}
+
+/* ---------------- actions ---------------- */
+function move(id, n) { const i = S.order.indexOf(id), j = i + n; if (i < 1 || j < 1 || j >= S.order.length) return; [S.order[i], S.order[j]] = [S.order[j], S.order[i]]; }
+
+document.addEventListener('click', ev => {
+  if (ev.target.closest('.mailhost a')) ev.preventDefault();
+  const b = ev.target.closest('[data-act]');
+  if (!b) { const blk = ev.target.closest('.blk'); if (blk) { UI.editing = blk.dataset.id; render(); } return; }
+  const { act, id, path } = b.dataset;
+  if (act === 'toggle') { if (!BLOCKS[id].locked) S.on[id] = !S.on[id]; }
+  else if (act === 'up') move(id, -1);
+  else if (act === 'down') move(id, 1);
+  else if (act === 'preset') { const keep = { seasonLabel: S.seasonLabel }; S = APP.teams[APP.ti] = preset(id); Object.assign(S, keep); applyEvent(S.cur); }
+  else if (act === 'go') return go(id);
+  else if (act === 'openTeam') { APP.ti = +id; return go('season'); }
+  else if (act === 'openEvent') { APP.ei = +id; return go('event'); }
+  else if (act === 'newFrom') return newFrom(id);
+  else if (act === 'addEvent') addEvent();
+  else if (act === 'delEvent') S.season.splice(+id, 1);
+  else if (act === 'reset') { if (!confirm('Replace everything with the example teams?')) return; APP.teams = EXAMPLES(); APP.teams.forEach(t => { S = t; applyEvent(t.cur); }); APP.ti = 0; return go('home'); }
+  else if (act === 'delTeam') { if (!confirm('Delete this team-season?')) return; APP.teams.splice(APP.ti, 1); if (!APP.teams.length) APP.teams = EXAMPLES().slice(0, 1); APP.ti = 0; return go('home'); }
+  else if (act === 'homeaway') { S.season[S.cur].home = id === '1'; applyEvent(S.cur); }
+  else if (act === 'noteOpen') UI.noteOpen = true;
+  else if (act === 'tab') UI.tab = id;
+  else if (act === 'edit') UI.editing = id;
+  else if (act === 'closeSheet') UI.editing = null;
+  else if (act === 'step') UI.step = Math.max(0, UI.step + +id);
+  else if (act === 'add') get(path).push({ ...(LIST_BLANK[path] || (path.endsWith('.times') ? LIST_BLANK['data.times.rows'] : {})) });
+  else if (act === 'del') get(path).splice(+b.dataset.i, 1);
+  else if (act === 'clear') set(path, '');
+  else if (act === 'copyPic') return copyPicture();
+  else if (act === 'copyText') return copyText();
+  else if (act === 'teamLink') return teamLink();
+  else if (act === 'copyLink') { const o = $('#linkOut'); try { navigator.clipboard.writeText(o.value).then(() => { b.textContent = 'Copied'; }, () => o.select()); } catch (e) { o.select(); } return; }
+  else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
+  render();
+  if (act === 'step') window.scrollTo(0, 0);
+});
+document.addEventListener('input', ev => {
+  const t = ev.target; if (!t.dataset.path) return;
+  set(t.dataset.path, t.type === 'checkbox' ? t.checked : t.value);
+  if (t.dataset.path.startsWith('season.')) { applyEvent(S.cur); const list = $('.wk-list'); if (list) list.outerHTML = wkList(); }
+  renderPreviews(); saveApp();
+});
+document.addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.dataset.import === 'schedule' && t.files[0]) {
+    // stand-in for the real parser: the file is accepted and sample rows appear in the editable list
+    addEvent(S.sport === 'flag'
+      ? [{ date: 'Sun · Oct 25', opp: 'Chiefs', home: true, where: 'Field 2' }, { date: 'Sun · Nov 1', opp: 'Bills', home: false, where: 'Field 1' }]
+      : [{ label: 'Tri Meet', date: 'Sat · Jan 9', opp: 'Wootton', home: false, where: 'Main Gym', venue: 'Wootton HS', address: 'Wootton High School\n2100 Wootton Pkwy\nRockville, MD' }]);
+    render(); return;
+  }
+  if (t.dataset.import === 'emails' && t.files[0]) { overlay(`<p class="eyebrow">Email list received</p><p style="margin:0">${esc(t.files[0].name)}. The real app reads the parent email columns and keeps them for league auto-send only. Nothing is stored in this prototype.</p>`); t.value = ''; return; }
+  if (!t.dataset.file || !t.files[0]) return;
+  const path = t.dataset.file;
+  const r = new FileReader();
+  r.onload = () => { set(path, r.result); render(); if (path === 'data.wear.photo') paletteFrom(r.result); };
+  r.readAsDataURL(t.files[0]);
+});
+
+/* team colors pulled from the jersey photo: the pickers stay as an override, not a chore */
+function paletteFrom(dataUrl) {
+  const im = new Image();
+  im.onload = () => {
+    const n = 64, c = document.createElement('canvas'); c.width = c.height = n;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0, n, n);
+    const px = x.getImageData(0, 0, n, n).data, at = i => [px[i], px[i + 1], px[i + 2], px[i + 3]];
+    // whatever sits in the four corners is backdrop, not jersey
+    const bg = [0, (n - 1) * 4, n * (n - 1) * 4, (n * n - 1) * 4].map(at).reduce((a, p) => a.map((v, k) => v + p[k] / 4), [0, 0, 0, 0]);
+    const bins = {};
+    for (let i = 0; i < px.length; i += 4) {
+      const [r, g, b, a] = at(i);
+      if (a < 128) continue;
+      if (bg[3] > 128 && Math.abs(r - bg[0]) + Math.abs(g - bg[1]) + Math.abs(b - bg[2]) < 70) continue;
+      const k = (r >> 4) << 8 | (g >> 4) << 4 | (b >> 4), o = bins[k] || (bins[k] = { n: 0, r: 0, g: 0, b: 0 });
+      o.n++; o.r += r; o.g += g; o.b += b;
+    }
+    const cols = Object.values(bins).map(o => ({ n: o.n, r: o.r / o.n, g: o.g / o.n, b: o.b / o.n })).sort((a, b) => b.n - a.n).slice(0, 14);
+    if (!cols.length) return;
+    const sat = q => { const mx = Math.max(q.r, q.g, q.b), mn = Math.min(q.r, q.g, q.b); return mx ? (mx - mn) / mx : 0; };
+    const lum = q => .299 * q.r + .587 * q.g + .114 * q.b;
+    const dist = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b);
+    const hex = q => '#' + [q.r, q.g, q.b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+    const mul = (q, f) => ({ r: q.r * f, g: q.g * f, b: q.b * f });
+    // primary: common, colorful, and dark enough to carry white type (darkened if it is not)
+    // a white away jersey is mostly white: the team color is whatever colorful trim it has
+    const vivid = cols.filter(q => sat(q) > .25);
+    let primary = [...(vivid.length ? vivid : cols)].sort((a, b) => b.n * (.35 + sat(b)) - a.n * (.35 + sat(a)))[0];
+    if (lum(primary) > 120) primary = mul(primary, 120 / lum(primary));
+    const accent = cols.filter(q => dist(q, primary) > 130 && lum(q) > 110).sort((a, b) => b.n * (.3 + sat(b)) - a.n * (.3 + sat(a)))[0] || { r: 200, g: 205, b: 208 };
+    // snap both to a named colorway: lighting wrecks the exact pixel values but keeps the hue,
+    // so we name what we see and then use clean canonical colors instead of the photo's
+    const P = snap(primary, true), A = snap(accent, false);
+    S.colors = { primary: P.hex, deep: P.deep, accent: A.hex };
+    S.colorway = `${P.name} / ${A.name}`;
+    render();
+  };
+  im.src = dataUrl;
+}
+// hue bins for team colors; a dark version of a hue gets its own name where teams actually use it
+const HUES = [
+  { name: 'Red', h: 0, hex: '#c8102e', dark: { name: 'Maroon', hex: '#6b1220' } },
+  { name: 'Orange', h: 25, hex: '#e8641b' },
+  { name: 'Gold', h: 45, hex: '#e0b23c' },
+  { name: 'Green', h: 120, hex: '#1f8a3b', dark: { name: 'Forest green', hex: '#1c4d2b' } },
+  { name: 'Teal', h: 185, hex: '#0d6b73' },
+  { name: 'Blue', h: 218, hex: '#1f5fbf', dark: { name: 'Navy', hex: '#0b2a5b' } },
+  { name: 'Purple', h: 265, hex: '#4b2a8a' },
+  { name: 'Pink', h: 330, hex: '#d63384' },
+];
+function snap(q, forPrimary) {
+  const r = q.r / 255, g = q.g / 255, b = q.b / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  const l = (mx + mn) / 2, s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+  let h = 0; if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h = (h * 60 + 360) % 360; }
+  let out;
+  if (s < .18) out = l < .25 ? { name: 'Black', hex: '#111111' } : l > .72 ? { name: 'White', hex: '#f4f4f4' } : { name: 'Silver', hex: '#a5acaf' };
+  else {
+    const bin = HUES.map(x => ({ x, dd: Math.min(Math.abs(x.h - h), 360 - Math.abs(x.h - h)) })).sort((a, b) => a.dd - b.dd)[0].x;
+    out = bin.dark && l < .28 ? bin.dark : { name: bin.name, hex: bin.hex };
+  }
+  // a primary must carry white type; a white or gold "primary" means the photo was mostly trim
+  if (forPrimary && (out.name === 'White' || out.name === 'Silver' || out.name === 'Gold')) out = { name: 'Black', hex: '#1b1b1b' };
+  const n = parseInt(out.hex.slice(1), 16), dk = v => Math.round(v * .38).toString(16).padStart(2, '0');
+  return { ...out, deep: '#' + dk(n >> 16) + dk((n >> 8) & 255) + dk(n & 255) };
+}
+document.addEventListener('keydown', ev => {
+  if (ev.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (ev.key === 'Escape' && UI.editing) { UI.editing = null; render(); }
+});
+
+/* ---------------- copy ---------------- */
+function overlay(html) { $('#overlay').innerHTML = `<div class="ov"><div class="box">${html}<div style="margin-top:12px"><button class="btn" data-act="closeOv">Done</button></div></div></div>`; }
+
+// one copy: the clipboard gets the whole email as HTML (picture + buttons), the picture alone, and plain text.
+// A mail app takes the richest form it supports. The promises go straight into ClipboardItem so Safari still counts this as the tap.
+function copyPicture() {
+  const shot = $('#shot'); shot.innerHTML = mailHTML({ flat: true });
+  const canvasP = html2canvas(shot.firstElementChild, { scale: 2, backgroundColor: null, logging: false });
+  const pngP = canvasP.then(c => new Promise(res => c.toBlob(res, 'image/png')));
+  const htmlP = canvasP.then(c => new Blob([`<div style="width:420px;max-width:100%"><img src="${c.toDataURL('image/png')}" width="420" style="display:block;width:420px;max-width:100%;height:auto" alt="Game day info">${footerHTML(true)}</div>`], { type: 'text/html' }));
+  const txtP = Promise.resolve(new Blob([textBlock()], { type: 'text/plain' }));
+  let copied = Promise.resolve(false);
+  try { copied = navigator.clipboard.write([new ClipboardItem({ 'text/html': htmlP, 'image/png': pngP, 'text/plain': txtP })]).then(() => true, () => false); } catch (e) {}
+  overlay('<p class="eyebrow">Building the email…</p>');
+  Promise.all([canvasP, copied]).then(([c, ok]) => {
+    shot.innerHTML = '';
+    if (S.season[S.cur]) { S.season[S.cur].sent = true; const list = $('.wk-list'); if (list) list.outerHTML = wkList(); const st = $('.status'); if (st) { st.textContent = 'Sent'; st.classList.add('sent'); } }
+    overlay(`<p class="eyebrow">${ok ? 'Email copied' : 'Email ready'}</p><p style="margin:0">${ok ? 'Paste it into your message and send.' : 'This browser would not copy it directly. Press and hold the picture (or right-click it) and choose Copy, then paste it into your message.'}</p>
+      <p class="hint" style="margin-top:6px">Prototype: the picture is drawn in your browser and the buttons ride along as HTML. Whether your mail app keeps the buttons on paste is the thing to check on a real phone.</p><img src="${c.toDataURL('image/png')}" alt="The finished email as one picture">`);
+  }).catch(() => overlay('<p class="eyebrow">Could not build the email here</p><p style="margin:0">The real app builds it on the server, so this step does not depend on your browser.</p>'));
+}
+function copyText() {
+  const txt = textBlock();
+  const done = ok => overlay(`<p class="eyebrow">${ok ? 'Text copied' : 'Select and copy'}</p><p style="margin:0">Paste it under the picture and send. Your mail app turns the links and phone numbers into taps.</p><textarea id="txtOut" readonly>${esc(txt)}</textarea>`);
+  try { navigator.clipboard.writeText(txt).then(() => done(true), () => done(false)); } catch (e) { done(false); }
+}
+
+/* ---------------- team link: the whole team-season rides in the link itself; no server, no login ---------------- */
+const rid = () => Math.random().toString(36).slice(2, 10);
+const b64u = u8 => btoa(String.fromCharCode(...u8)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+const pipe = (bytes, x) => new Response(new Blob([bytes]).stream().pipeThrough(x));
+async function squeeze(obj) { return b64u(new Uint8Array(await pipe(JSON.stringify(obj), new CompressionStream('deflate-raw')).arrayBuffer())); }
+async function unsqueeze(str) { return JSON.parse(await pipe(unb64u(str), new DecompressionStream('deflate-raw')).text()); }
+async function teamLink() {
+  S.id = S.id || rid(); saveApp();
+  // pictures are too big to ride in a link; they stay on the device that added them
+  const t = JSON.parse(JSON.stringify(S)); t.data.wear.photo = ''; t.data.map.own = '';
+  const url = `${location.origin}${location.pathname}#t=${await squeeze(t)}`;
+  overlay(`<p class="eyebrow">Team link · ${esc(S.data.event.team)}</p><p style="margin:0">Open this link on any phone or computer and the team is there, schedule and all. Anyone you send it to gets a copy, so share it with co-coaches only.</p>
+    <textarea readonly id="linkOut" style="min-height:96px;font-size:11.5px;word-break:break-all">${esc(url)}</textarea>
+    <div class="send" style="margin-top:10px"><div class="btns"><button class="btn" data-act="copyLink">Copy link</button><a class="btn alt" href="sms:?&body=${encodeURIComponent(url)}" style="text-align:center;text-decoration:none">Text it to me</a></div></div>
+    <p class="hint" style="margin-top:10px">The link is a snapshot of the team right now. Change something later and you'd grab a fresh link. Pictures stay on this device.</p>`);
+}
+async function importFromLink() {
+  const m = location.hash.match(/^#t=([\w-]+)$/); if (!m) return;
+  history.replaceState(null, '', location.pathname);
+  let t; try { t = await unsqueeze(m[1]); if (!t || !t.data || !Array.isArray(t.season)) throw 0; }
+  catch (e) { overlay('<p class="eyebrow">That link is damaged</p><p style="margin:0">Part of it may have been cut off when it was sent. Ask for it again.</p>'); return; }
+  const i = APP.teams.findIndex(x => x.id && x.id === t.id);
+  if (i >= 0) {
+    const old = APP.teams[i];
+    t.data.wear.photo = old.data.wear.photo || ''; t.data.map.own = old.data.map.own || '';
+    if (JSON.stringify(old) !== JSON.stringify(t) && !confirm(`Replace ${old.data.event.team} on this device with the copy in the link?`)) return;
+    APP.teams[i] = t; APP.ti = i;
+  } else {
+    if (freshDevice) APP.teams = [];                // a fresh device: the linked team, not the examples
+    freshDevice = false;
+    APP.teams.push(t); APP.ti = APP.teams.length - 1;
+  }
+  S = t; applyEvent(t.cur); go('season');
+}
+window.addEventListener('hashchange', importFromLink);
+
+/* ---------------- boot ---------------- */
+render();
+importFromLink();
+</script>
