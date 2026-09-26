@@ -16,7 +16,7 @@
   button, input, select, textarea { font:inherit; color:inherit; }
   button { cursor:pointer; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  .wrap { max-width:1080px; margin:0 auto; }
+  .wrap { max-width:1180px; margin:0 auto; }
   .top { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-bottom:16px; }
   .top h1 { font:400 30px/1 Anton, Impact, sans-serif; text-transform:uppercase; letter-spacing:.02em; margin:0; }
   .top p { margin:0; color:var(--mute); font-size:13px; }
@@ -86,12 +86,17 @@
   details.dump pre { max-height:260px; overflow:auto; font-size:11.5px; background:var(--soft); border-radius:8px; padding:10px; margin:8px 0 0; }
 
   /* A: workbench */
-  .wb { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,440px); gap:24px; align-items:start; }
-  .wb .pv { position:sticky; top:12px; max-height:calc(100vh - 130px); overflow:auto; border-radius:22px; }
+  .wb { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,460px); gap:24px; align-items:start; }
+  .wb .pvcol { position:sticky; top:calc(env(safe-area-inset-top, 0px) + 12px); max-height:calc(100vh - 24px); overflow:auto; overscroll-behavior:contain; border-radius:16px; }
+  .wb .pvcol .email-pv { max-width:none; }
+  .pvcol [data-blk] { cursor:pointer; }
+  [data-blk].glow, [data-grp].glow { animation:glow 900ms ease-out; }
+  @keyframes glow { from { box-shadow:0 0 0 3px #ffd23f, 0 0 18px 4px rgba(255,210,63,.6); } to { box-shadow:0 0 0 3px rgba(255,210,63,0), 0 0 18px 4px rgba(255,210,63,0); } }
+  @media (prefers-reduced-motion: reduce) { [data-blk].glow, [data-grp].glow { animation:none; } }
   .tabs { display:none; margin-bottom:12px; }
   @media (max-width: 899px) {
     .wb { grid-template-columns:minmax(0,1fr); }
-    .wb .pv { position:static; max-height:none; overflow:visible; }
+    .wb .pvcol { position:static; max-height:none; overflow:visible; }
     .tabs { display:inline-flex; }
     .wb[data-tab="build"] .pvcol { display:none; }
     .wb[data-tab="preview"] .edcol { display:none; }
@@ -709,7 +714,7 @@ function footerHTML(flat) {
   const buttons = (cells, align) => `<table role="presentation" cellpadding="0" cellspacing="0" align="${align}"><tr>${cells.join(gap)}</tr></table>`;
   const muted = (href, t) => `<a href="${esc(href)}" style="color:#b9c0c7;text-decoration:none;"><span style="color:#b9c0c7;">${esc(t)}</span></a>`;
   const head = (lab, big) => `<tr><td align="left" style="padding:16px 18px 4px;font-family:${font};text-align:left;"><div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#9aa3aa;">${esc(lab.toUpperCase())}</div><div style="font-size:24px;font-weight:900;color:#ffffff;margin-top:4px;">${esc(big.toUpperCase())}</div></td></tr>`;
-  const cardT = inner => `<tr><td style="padding:0 12px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${card}" style="background:${card};border-radius:18px;">${inner}</table></td></tr>`;
+  const cardT = (inner, id) => `<tr data-blk="${id}"><td style="padding:0 12px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${card}" style="background:${card};border-radius:18px;">${inner}</table></td></tr>`;
   let h = '';
   if (S.on.map || S.on.link) {
     const b = [];
@@ -717,13 +722,13 @@ function footerHTML(flat) {
     if (S.on.link) b.push(ghost(d.link.url, d.link.button.toUpperCase()));
     const sub = S.on.map ? `<div style="font-size:12px;line-height:18px;margin-top:2px;color:#b9c0c7;">${esc(d.map.address.replace(/\n/g, ' · '))}</div>` : '';
     const vol = S.on.link && d.link.vol ? `<div style="font-size:14px;font-weight:700;line-height:20px;margin-top:8px;color:#ffffff;">${esc(d.link.vol)}</div>` : '';
-    h += cardT(head(S.on.map ? 'Get there' : d.link.label, S.on.map ? e.venue : d.link.button) + `<tr><td align="left" style="padding:0 18px 16px;font-family:${font};color:#ffffff;text-align:left;">${sub}${vol}<div style="margin-top:12px;">${buttons(b, 'left')}</div></td></tr>`);
+    h += cardT(head(S.on.map ? 'Get there' : d.link.label, S.on.map ? e.venue : d.link.button) + `<tr><td align="left" style="padding:0 18px 16px;font-family:${font};color:#ffffff;text-align:left;">${sub}${vol}<div style="margin-top:12px;">${buttons(b, 'left')}</div></td></tr>`, S.on.link ? 'link' : 'map');
   }
   if (S.on.coach) {
     const rows = d.coach.list.map((c, i) => `<tr><td align="left" style="padding:12px 0;text-align:left;${i ? `border-top:1px solid ${rule};` : ''}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
       <td align="left" style="font-family:${font};color:#ffffff;vertical-align:middle;text-align:left;"><div style="font-size:17px;font-weight:800;letter-spacing:.5px;">${esc(c.name.toUpperCase())}</div><div style="font-size:12px;line-height:18px;margin-top:2px;">${muted(`sms:${c.phone.replace(/\D/g, '')}`, c.phone)}<br>${muted(`mailto:${c.email}`, c.email)}</div></td>
       <td align="right" style="vertical-align:middle;white-space:nowrap;">${buttons([fill(`sms:${c.phone.replace(/\D/g, '')}`, 'TEXT'), ghost(`mailto:${c.email}`, 'EMAIL')], 'right')}</td></tr></table></td></tr>`).join('');
-    h += cardT(head('Questions?', 'Text or email the coaches') + `<tr><td style="padding:4px 18px 6px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>`);
+    h += cardT(head('Questions?', 'Text or email the coaches') + `<tr><td style="padding:4px 18px 6px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>`, 'coach');
   }
   const tit = `${e.team} ${e.accent}${e.opp ? ` ${e.oppLabel} ${e.opp}` : ''} · ${e.date}${S.on.times ? ' · ' + d.times.rows.map(r => `${r.label} ${r.time}`).join(' · ') : ''}`;
   h += `<tr><td align="center" style="padding:2px 12px 14px;font-family:${font};font-size:11px;line-height:16px;color:#9aa3aa;text-align:center;">${esc(tit)}<br>Made with Game Day · coach.arvideo.io</td></tr>`;
@@ -734,7 +739,7 @@ function mailHTML({ flat = false, handles = false, only = null } = {}) {
   const ids = only ? (only === 'times' ? ['event'] : [only]) : visible();
   const body = ids.map(id => {
     const h = blockHTML(id);
-    if (!handles) return h;
+    if (!handles) return flat ? h : `<div data-blk="${id}">${h}</div>`;
     const lock = BLOCKS[id].locked;
     return `<div class="blk" data-id="${id}">${h}<div class="hnd"><button data-act="edit" data-id="${id}">Edit</button>${lock ? '' : `<button data-act="up" data-id="${id}" aria-label="Move up">&uarr;</button><button data-act="down" data-id="${id}" aria-label="Move down">&darr;</button><button data-act="toggle" data-id="${id}" aria-label="Remove">&times;</button>`}</div></div>`;
   }).join('');
@@ -800,19 +805,19 @@ const sendPanel = () => `<div class="panel send sendp"><p class="eyebrow">Send i
 /* ---------------- variants ---------------- */
 function groupHTML(id) {
   const lock = BLOCKS[id].locked || id === 'times';
-  return `<div class="grp"><div class="grp-h"><h3>${BLOCKS[id].name}</h3>${lock ? '' : `<div class="mv"><button data-act="up" data-id="${id}" aria-label="Move ${BLOCKS[id].name} up">&uarr;</button><button data-act="down" data-id="${id}" aria-label="Move ${BLOCKS[id].name} down">&darr;</button></div>`}</div><div class="flds">${fieldsFor(id)}</div></div>`;
+  return `<div class="grp" data-grp="${id}"><div class="grp-h"><h3>${BLOCKS[id].name}</h3>${lock ? '' : `<div class="mv"><button data-act="up" data-id="${id}" aria-label="Move ${BLOCKS[id].name} up">&uarr;</button><button data-act="down" data-id="${id}" aria-label="Move ${BLOCKS[id].name} down">&darr;</button></div>`}</div><div class="flds">${fieldsFor(id)}</div></div>`;
 }
-function editorOrder() { const ids = visible(); const out = []; ids.forEach(id => { out.push(id); if (id === 'event' && S.on.times) out.push('times'); }); return out; }
+function editorOrder() { const ids = S.order.filter(id => S.on[id]); const out = []; ids.forEach(id => { out.push(id); if (id === 'event' && S.on.times) out.push('times'); }); return out; }
 
 function VariantA() {
   return `<div class="seg tabs" role="group" aria-label="View">${['build', 'preview'].map(t => `<button data-act="tab" data-id="${t}" aria-pressed="${UI.tab === t}">${t}</button>`).join('')}</div>
   <div class="wb" data-tab="${UI.tab}">
     <div class="edcol stack">
       ${schedulePanel()}
-      <div class="panel stack"><div><p class="eyebrow">What goes in the email</p>${chips()}</div><div><p class="eyebrow">Team colors</p>${teamFields()}</div></div>
+      <div class="panel stack"><div><p class="eyebrow">What goes in the email</p>${chips()}</div><div data-grp="colors"><p class="eyebrow">Team colors</p>${teamFields()}</div></div>
       <div class="panel stack">${editorOrder().map(groupHTML).join('')}</div>
     </div>
-    <div class="pvcol stack"><div class="pv mailhost"></div>${sendPanel()}</div>
+    <div class="pvcol"><div class="pv mailhost"></div></div>
   </div>`;
 }
 function VariantB() {
@@ -966,11 +971,35 @@ document.addEventListener('click', ev => {
   render();
   if (act === 'step') window.scrollTo(0, 0);
 });
+// which email block a setting shows up in
+function blockOf(path) {
+  if (!path) return null;
+  if (path.startsWith('colors') || path.startsWith('season')) return 'event';
+  const m = path.match(/^data\.(\w+)/); if (!m) return null;
+  return m[1] === 'times' ? 'event' : m[1];
+}
+const twoPane = () => APP.page === 'setup' && matchMedia('(min-width: 900px)').matches;
+function showBlock(id, glow) {
+  if (!id || !twoPane()) return;
+  const col = $('.pvcol'), el = col && col.querySelector(`[data-blk="${id}"]`); if (!el) return;
+  const cr = col.getBoundingClientRect(), er = el.getBoundingClientRect();
+  if (er.top < cr.top + 20 || er.bottom > cr.bottom - 20) col.scrollTo({ top: col.scrollTop + er.top - cr.top - Math.max(20, (cr.height - er.height) / 2), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  if (glow) { el.classList.remove('glow'); void el.offsetWidth; el.classList.add('glow'); }
+}
+document.addEventListener('focusin', ev => { const t = ev.target; showBlock(blockOf(t.dataset && (t.dataset.path || t.dataset.file)), false); });
+document.addEventListener('click', ev => {
+  if (!twoPane()) return;
+  const pb = ev.target.closest('.pvcol [data-blk]'); if (!pb) return;
+  const id = pb.dataset.blk, g = $(`.edcol [data-grp="${id}"]`); if (!g) return;
+  g.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  g.classList.remove('glow'); void g.offsetWidth; g.classList.add('glow');
+  const f = g.querySelector('input:not([type=file]), textarea, select'); if (f) f.focus({ preventScroll: true });
+});
 document.addEventListener('input', ev => {
   const t = ev.target; if (!t.dataset.path) return;
   set(t.dataset.path, t.type === 'checkbox' ? t.checked : t.value);
   if (t.dataset.path.startsWith('season.')) { applyEvent(S.cur); const list = $('.wk-list'); if (list) list.outerHTML = wkList(); }
-  renderPreviews(); saveApp();
+  renderPreviews(); saveApp(); showBlock(blockOf(t.dataset.path), true);
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
