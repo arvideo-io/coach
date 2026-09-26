@@ -234,6 +234,7 @@
   .apark b { width:30px; height:30px; border-radius:7px; background:#1f6fd1; border:2px solid #fff; color:#fff; font:400 22px/28px Anton, Impact, sans-serif; text-align:center; }
   .apark span { font:800 15px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing:.2em; color:#fff; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000; }
   .aer.editing[data-mode="box"] .apark { pointer-events:auto; cursor:move; }
+  .abox.sel, .apark.sel { outline:3px dashed #ffd23f; outline-offset:2px; }
   .abox.ghost { border:2px dashed #fff; background:rgba(255,255,255,.2); }
   .aer[data-mode="pin"] { cursor:move; }
   .aer .attr { position:absolute; right:6px; bottom:5px; font:600 9.5px/1 Inter, Arial, sans-serif; color:#fff; background:rgba(0,0,0,.45); padding:3px 5px; border-radius:4px; }
@@ -392,7 +393,7 @@ function _preset(sport) {
       times: { rows: [ { label: 'Practice', time: '10:30', hot: false }, { label: 'Game', time: '11:30', hot: true } ] },
       wear: { label: 'Wear', big: 'Home Jerseys', tag: 'Dark', style: 'dark', photo: '', generic: { shape: 'tshirt', color: '#004C54', glyph: 'football' } },
       map: { label: "We're on", big: 'Field 3', address: 'EE Halmos Park\n17001 Hoskinson Rd\nPoolesville, MD', pin: { label: 'Field 3' }, own: '',
-             center: { lat: 39.134128, lon: -77.412408 }, span: 230, rot: 3, h: 700,
+             center: { lat: 39.134128, lon: -77.412304 }, span: 250, rot: 3, h: 700,
              boxes: [ { label: 'Field 1', x0: -8617478.8, y0: 4740925.4, x1: -8617396.3, y1: 4740960.7 },
                       { label: 'Field 2', x0: -8617478.8, y0: 4740839.3, x1: -8617443.5, y1: 4740921.8 },
                       { label: 'Field 3', x0: -8617431.3, y0: 4740839.3, x1: -8617395.9, y1: 4740921.8 },
@@ -416,6 +417,7 @@ function normalizeTeam(t) {
   delete m.pin.u; delete m.pin.v; delete m.pin.x; delete m.pin.y;
   if (!Array.isArray(m.boxes)) m.boxes = []; m.boxes = m.boxes.filter(b => b && typeof b.x0 === 'number'); m.rot = m.rot || 0;
   if (![250, 420, 700].includes(m.h)) delete m.h;
+  delete m.raw;
   // an aerial saved before rotation existed has no raw square; the next rotate/pan refetches it
   return t;
 }
@@ -423,7 +425,19 @@ function loadApp() {
   try { const j = JSON.parse(localStorage.getItem(STORE) || 'null'); if (j && Array.isArray(j.teams) && j.teams.length) { j.teams.forEach(normalizeTeam); return { teams: j.teams, ti: 0, ei: 0, page: 'home', saved: true }; } } catch (e) {}
   return { teams: EXAMPLES(), ti: 0, ei: 0, page: 'home', saved: false };
 }
-function saveApp() { try { localStorage.setItem(STORE, JSON.stringify({ teams: APP.teams })); APP.saved = true; APP.saveFailed = false; } catch (e) { APP.saveFailed = true; } }
+const RAW = new WeakMap();                                         // map object -> raw aerial square (memory only)
+function saveNow() { clearTimeout(saveNow.t); try { localStorage.setItem(STORE, JSON.stringify({ teams: APP.teams }, (k, v) => k === 'raw' ? undefined : v)); APP.saved = true; APP.saveFailed = false; } catch (e) { APP.saveFailed = true; } }
+function saveApp() { clearTimeout(saveNow.t); saveNow.t = setTimeout(saveNow, 400); }
+addEventListener('pagehide', saveNow); addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
+// one decoded copy per picture instead of a fresh multi-hundred-KB data URL in every re-render
+const BLOB = new Map();
+function picURL(data) {
+  if (!data || !data.startsWith('data:')) return data || '';
+  let u = BLOB.get(data); if (u) return u;
+  try { const [h, b64] = data.split(','), bin = atob(b64), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); u = URL.createObjectURL(new Blob([a], { type: h.slice(5, h.indexOf(';')) })); } catch (e) { u = data; }
+  if (BLOB.size > 12) { const [k, v] = BLOB.entries().next().value; URL.revokeObjectURL(v); BLOB.delete(k); }
+  BLOB.set(data, u); return u;
+}
 const APP = loadApp();
 let freshDevice = !APP.saved;                     // render() saves, so remember this before the first one
 let S = APP.teams[0];
@@ -514,13 +528,13 @@ function aerialHTML(m, editing) {
   const boxes = (m.center && Array.isArray(m.boxes)) ? m.boxes : [], H = mapH(m);
   const bxs = boxes.map((bx, i) => {
     const r = boxDisp(m, bx);
-    if (/^p(arking)?$/i.test(bx.label || '')) return `<div class="apark" data-box="${i}" style="left:${(r.x + r.w / 2) * 100}%;top:${(r.y + r.h / 2) * 100}%"><b>P</b><span>PARKING</span></div>`;
+    if (/^p(arking)?$/i.test(bx.label || '')) return `<div class="apark${editing && UI.selBox === i ? ' sel' : ''}" data-box="${i}" style="left:${(r.x + r.w / 2) * 100}%;top:${(r.y + r.h / 2) * 100}%"><b>P</b><span>PARKING</span></div>`;
     const fs = Math.max(11, Math.min(26, r.w * MAPW / 3.3, r.h * H / 2.2));
-    return `<div class="abox${isOurs(m, bx) ? ' ours' : ''}" data-box="${i}" style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"><span style="font-size:${fs.toFixed(1)}px">${esc(bx.label || '')}</span></div>`;
+    return `<div class="abox${isOurs(m, bx) ? ' ours' : ''}${editing && UI.selBox === i ? ' sel' : ''}" data-box="${i}" style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"><span style="font-size:${fs.toFixed(1)}px">${esc(bx.label || '')}</span></div>`;
   }).join('');
   let pin = '';
   if (!boxes.length && m.center && m.pin && typeof m.pin === 'object' && m.pin.mx != null) { const [px, py] = worldToDisp(m, m.pin.mx, m.pin.my); pin = `<div class="apin" style="left:${px * 100}%;top:${py * 100}%"><div class="dot"></div><div class="lab">${esc(m.pin.label || '')}</div></div>`; }
-  return `<div class="aer${editing ? ' editing' : ''}" data-mode="${editing ? (UI.mapMode || 'box') : ''}" style="aspect-ratio:${MAPW}/${H}"><img src="${m.img}" alt="" draggable="false">${bxs}${pin}<div class="attr">Imagery: USGS NAIP</div></div>`;
+  return `<div class="aer${editing ? ' editing' : ''}" data-mode="${editing ? (UI.mapMode || 'box') : ''}" style="aspect-ratio:${MAPW}/${H}"><img src="${picURL(m.img)}" alt="" draggable="false">${bxs}${pin}<div class="attr">Imagery: USGS NAIP</div></div>`;
 }
 // true-size fields, in yards (width x length); placed at the view center and dragged into place
 const FIELD_SIZES = [['flag', 'NFL FLAG 30×70 yd', 30, 70], ['u6', 'Soccer U6 20×30 yd', 20, 30], ['u8', 'Soccer U8 30×50 yd', 30, 50], ['u10', 'Soccer U10 45×70 yd', 45, 70], ['u12', 'Soccer U12 55×85 yd', 55, 85], ['full', 'Soccer full 75×115 yd', 75, 115], ['lax', 'Lacrosse 60×110 yd', 60, 110]];
@@ -574,7 +588,7 @@ async function fetchSquare(lat, lon, span) {
 }
 const loadImg = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
 async function composeAerial(m) {
-  const im = await loadImg(m.raw), c = document.createElement('canvas'), side = mapS(m) * 2; c.width = MAPW * 2; c.height = mapH(m) * 2;
+  const im = await loadImg(RAW.get(m)), c = document.createElement('canvas'), side = mapS(m) * 2; c.width = MAPW * 2; c.height = mapH(m) * 2;
   const x = c.getContext('2d'); x.translate(c.width / 2, c.height / 2); x.rotate((m.rot || 0) * Math.PI / 2); x.drawImage(im, -side / 2, -side / 2, side, side);
   m.img = c.toDataURL('image/jpeg', .85);
 }
@@ -584,7 +598,7 @@ const aerialInFlight = new Set();
 function ensureAerial() {
   const m = S && S.data && S.data.map; if (!m || !m.center || m.img || m.own || aerialInFlight.has(m) || /claude\.ai$/.test(location.hostname)) return;
   aerialInFlight.add(m); m.span = m.span || 240;
-  fetchSquare(m.center.lat, m.center.lon, m.span).then(raw => { m.raw = raw; return composeAerial(m); }).then(() => render()).catch(e => console.warn('aerial', e)).finally(() => aerialInFlight.delete(m));
+  fetchSquare(m.center.lat, m.center.lon, m.span).then(raw => { RAW.set(m, raw); return composeAerial(m); }).then(() => render()).catch(e => console.warn('aerial', e)).finally(() => aerialInFlight.delete(m));
 }
 async function findOnMap(recenter) {
   const m = S.data.map, st = $('#mapStatus');
@@ -597,7 +611,7 @@ async function findOnMap(recenter) {
       const keep = (m.pin && typeof m.pin === 'object' && m.pin.label) || m.pin_label || (typeof m.pin === 'string' ? m.pin : ''); const [pmx, pmy] = merc(g.lat, g.lon); m.pin = { mx: pmx, my: pmy, label: keep };
     }
     if (st) st.textContent = 'Fetching the aerial…';
-    m.raw = await fetchSquare(m.center.lat, m.center.lon, m.span); await composeAerial(m);
+    RAW.set(m, await fetchSquare(m.center.lat, m.center.lon, m.span)); await composeAerial(m);
     render();
   } catch (e) { mapFail(st, e); }
 }
@@ -605,9 +619,14 @@ async function findOnMap(recenter) {
 async function nudgeMap(op) {
   const m = S.data.map; if (!m.center) return;
   const st = $('#mapStatus');
-  if (op === 'wide' || op === 'square' || op === 'tall') { m.h = { wide: 250, square: 420, tall: 700 }[op]; m.raw = ''; }
-  if (op === 'rot' || op === 'wide' || op === 'square' || op === 'tall') { if (op === 'rot') m.rot = ((m.rot || 0) + 1) % 4; if (st) st.textContent = 'Redrawing…'; try { if (!m.raw) m.raw = await fetchSquare(m.center.lat, m.center.lon, m.span); await composeAerial(m); render(); } catch (e) { mapFail(st, e); } return; }
+  if (op === 'wide' || op === 'square' || op === 'tall') { m.h = { wide: 250, square: 420, tall: 700 }[op]; RAW.delete(m); }
+  if (op === 'rot' || op === 'wide' || op === 'square' || op === 'tall') { if (op === 'rot') m.rot = ((m.rot || 0) + 1) % 4; if (st) st.textContent = 'Redrawing…'; try { if (!RAW.get(m)) RAW.set(m, await fetchSquare(m.center.lat, m.center.lon, m.span)); await composeAerial(m); render(); } catch (e) { mapFail(st, e); } return; }
   const k = m.rot || 0, R = [[1, 0], [0, 1], [-1, 0], [0, -1]][k], U = [[0, 1], [-1, 0], [0, -1], [1, 0]][k];   // display right/up as world east/north
+  if (UI.selBox != null && m.boxes && m.boxes[UI.selBox] && ['left', 'right', 'up', 'down'].includes(op)) {
+    const bx = m.boxes[UI.selBox], st2 = 2 / Math.cos(m.center.lat * Math.PI / 180);   // 2 ground m per tap
+    const v = { left: [-R[0], -R[1]], right: R, up: U, down: [-U[0], -U[1]] }[op];
+    bx.x0 += v[0] * st2; bx.x1 += v[0] * st2; bx.y0 += v[1] * st2; bx.y1 += v[1] * st2; render(); return;
+  }
   const [x, y] = merc(m.center.lat, m.center.lon), step = m.span * .25;
   const unmerc = (mx, my) => ({ lon: mx / 20037508.34 * 180, lat: Math.atan(Math.exp(my / 20037508.34 * Math.PI)) * 360 / Math.PI - 90 });
   const mv = (vx, vy, f) => { m.center = unmerc(x + vx * f, y + vy * f); };
@@ -615,7 +634,7 @@ async function nudgeMap(op) {
   else if (op === 'left') mv(R[0], R[1], -step); else if (op === 'right') mv(R[0], R[1], step);
   else if (op === 'up') mv(U[0], U[1], step * mapH(m) / mapS(m)); else if (op === 'down') mv(U[0], U[1], -step * mapH(m) / mapS(m));
   if (st) st.textContent = 'Fetching…';
-  try { m.raw = await fetchSquare(m.center.lat, m.center.lon, m.span); await composeAerial(m); render(); } catch (e) { mapFail(st, e); }
+  try { RAW.set(m, await fetchSquare(m.center.lat, m.center.lon, m.span)); await composeAerial(m); render(); } catch (e) { mapFail(st, e); }
 }
 // in the editor: pin mode moves the pin; box mode drags a box to draw one, or drags inside an existing box to move it
 document.addEventListener('pointerdown', ev => {
@@ -632,13 +651,14 @@ document.addEventListener('pointerdown', ev => {
     const move = e => { const [x, y] = frac(e); [m.pin.mx, m.pin.my] = dispToWorld(m, x, y); const pin = host.querySelector('.apin'); if (pin) { pin.style.left = x * 100 + '%'; pin.style.top = y * 100 + '%'; } };
     move(ev); finish(move); return;
   }
-  const hit = ev.target.closest('.abox'); const [x0, y0] = frac(ev);
+  const hit = ev.target.closest('.abox, .apark'); const [x0, y0] = frac(ev);
   if (hit && hit.dataset.box != null) {
-    // move the box the pointer landed on
-    const bx = m.boxes[+hit.dataset.box]; let [lx, ly] = dispToWorld(m, x0, y0);
-    const move = e => { const [x, y] = frac(e); const [wx, wy] = dispToWorld(m, x, y); bx.x0 += wx - lx; bx.x1 += wx - lx; bx.y0 += wy - ly; bx.y1 += wy - ly; lx = wx; ly = wy; const rr = boxDisp(m, bx); hit.style.left = rr.x * 100 + '%'; hit.style.top = rr.y * 100 + '%'; };
-    finish(move); return;
+    // tap selects the box (then the arrows move it); drag moves it
+    const i = +hit.dataset.box, bx = m.boxes[i]; let [lx, ly] = dispToWorld(m, x0, y0), moved = 0;
+    const move = e => { const [x, y] = frac(e); moved = Math.max(moved, Math.abs(x - x0) + Math.abs(y - y0)); const [wx, wy] = dispToWorld(m, x, y); bx.x0 += wx - lx; bx.x1 += wx - lx; bx.y0 += wy - ly; bx.y1 += wy - ly; lx = wx; ly = wy; const rr = boxDisp(m, bx); if (hit.classList.contains('apark')) { hit.style.left = (rr.x + rr.w / 2) * 100 + '%'; hit.style.top = (rr.y + rr.h / 2) * 100 + '%'; } else { hit.style.left = rr.x * 100 + '%'; hit.style.top = rr.y * 100 + '%'; } };
+    UI.selBox = i; finish(move); return;
   }
+  if (UI.selBox != null) { UI.selBox = null; mapDragging = false; render(); return; }   // tapping empty map deselects
   const ghost = document.createElement('div'); ghost.className = 'abox ghost'; host.appendChild(ghost);
   let x1 = x0, y1 = y0;
   const draw = () => { ghost.style.left = Math.min(x0, x1) * 100 + '%'; ghost.style.top = Math.min(y0, y1) * 100 + '%'; ghost.style.width = Math.abs(x1 - x0) * 100 + '%'; ghost.style.height = Math.abs(y1 - y0) * 100 + '%'; };
@@ -751,7 +771,7 @@ function fieldsFor(id) {
     case 'map': { const m = get('data.map'); if (typeof m.pin === 'string') { m.pin_label = m.pin; m.pin = null; }
       return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.address', 'Address', { area: true, wide: true })
       + `<div class="fld wide"><button class="btn alt" data-act="findMap" data-id="${m.img ? 1 : 0}" style="align-self:flex-start">${m.img ? 'Find again from the address' : 'Find on map'}</button>${m.img ? '' : ''}<span id="mapStatus" class="hint" style="margin-top:4px"></span></div>`
-      + (m.img && !m.own ? `<div class="fld wide"><span>${(UI.mapMode || 'box') === 'box' ? 'Drag a box around each field (the first one is yours). Arrows move the picture, + and − zoom, ↻ rotates.' : 'Drag the pin onto the field, gym door or parking.'}</span>${aerialHTML(m, true)}
+      + (m.img && !m.own ? `<div class="fld wide"><span>${(UI.mapMode || 'box') === 'pin' ? 'Drag the pin onto the field, gym door or parking.' : UI.selBox != null ? `Moving ${esc((m.boxes[UI.selBox] || {}).label || 'box')}: the arrows move it 2 m a tap. Tap empty map when done.` : 'Add a field at true size below, or drag on the map to draw a box. Tap a box to move it with the arrows. With nothing selected the arrows move the picture.'}</span>${aerialHTML(m, true)}
           <div class="mapnav"><div class="seg" style="margin-right:6px"><button data-act="mapMode" data-id="box" aria-pressed="${(UI.mapMode || 'box') === 'box'}">Boxes</button><button data-act="mapMode" data-id="pin" aria-pressed="${UI.mapMode === 'pin'}">Pin</button></div><button class="icon" data-act="nudge" data-id="left" aria-label="Move left">&larr;</button><button class="icon" data-act="nudge" data-id="up" aria-label="Move up">&uarr;</button><button class="icon" data-act="nudge" data-id="down" aria-label="Move down">&darr;</button><button class="icon" data-act="nudge" data-id="right" aria-label="Move right">&rarr;</button><span style="width:6px"></span><button class="icon" data-act="nudge" data-id="in" aria-label="Zoom in">+</button><button class="icon" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button><button class="icon" data-act="nudge" data-id="rot" aria-label="Rotate a quarter turn">&#8635;</button><span style="width:6px"></span><div class="seg">${[['wide', 'Wide'], ['square', 'Square'], ['tall', 'Tall']].map(([k, n]) => `<button data-act="nudge" data-id="${k}" aria-pressed="${mapH(m) === { wide: 250, square: 420, tall: 700 }[k]}">${n}</button>`).join('')}</div></div>
           <div class="row" style="margin-top:8px"><select id="fieldSize" aria-label="Field size"><option value="">Add a field at true size…</option>${FIELD_SIZES.map(f => `<option value="${f[0]}">${f[1]}</option>`).join('')}</select><button class="add" data-act="addField">Add</button></div>
           ${(m.boxes || []).length ? `<div class="rows" style="margin-top:8px">${m.boxes.map((bx, i) => `<div class="row"><span class="hot" style="width:14px;height:14px;border-radius:3px;background:${isOurs(m, bx) ? '#ff1f1f' : 'transparent'};border:1.5px solid ${isOurs(m, bx) ? '#ff1f1f' : 'var(--line)'}" title="${isOurs(m, bx) ? 'Highlighted this week' : ''}"></span><input type="text" data-path="data.map.boxes.${i}.label" value="${esc(bx.label || '')}" placeholder="Label (Field 1, Parking…)" aria-label="Box label"><button class="icon" data-act="boxTurn" data-id="${i}" aria-label="Turn this box a quarter turn" title="Turn">&#8635;</button><button class="icon" data-act="boxDel" data-id="${i}" aria-label="Remove box">&times;</button></div>`).join('')}</div><p class="hint">The box whose label matches the event's field ("${esc(m.big || '')}") is highlighted. Drag a box to move it.</p>` : ''}</div>` : '')
@@ -938,9 +958,9 @@ document.addEventListener('click', ev => {
   else if (act === 'findMap') return findOnMap(id === '1');
   else if (act === 'nudge') return nudgeMap(id);
   else if (act === 'mapMode') UI.mapMode = id;
-  else if (act === 'boxDel') S.data.map.boxes.splice(+id, 1);
+  else if (act === 'boxDel') { S.data.map.boxes.splice(+id, 1); UI.selBox = null; }
   else if (act === 'boxTurn') { const bx = S.data.map.boxes[+id], cx = (bx.x0 + bx.x1) / 2, cy = (bx.y0 + bx.y1) / 2, w = bx.x1 - bx.x0, h = bx.y1 - bx.y0; bx.x0 = cx - h / 2; bx.x1 = cx + h / 2; bx.y0 = cy - w / 2; bx.y1 = cy + w / 2; }
-  else if (act === 'addField') { const sel = $('#fieldSize'); if (sel && sel.value) addField(sel.value); }
+  else if (act === 'addField') { const sel = $('#fieldSize'); if (sel && sel.value) { addField(sel.value); UI.selBox = S.data.map.boxes.length - 1; } }
   else if (act === 'copyLink') { const o = $('#linkOut'); try { navigator.clipboard.writeText(o.value).then(() => { b.textContent = 'Copied'; }, () => o.select()); } catch (e) { o.select(); } return; }
   else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
   render();
