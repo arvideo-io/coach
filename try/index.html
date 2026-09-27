@@ -138,6 +138,21 @@
     .icon, .mv button, .hnd button { min-width:40px; min-height:40px; }
     .remind select { min-height:40px; }
   }
+  .ov .box.imp { max-width:760px; }
+  .impcols { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; margin-bottom:10px; }
+  .impcols span { display:flex; flex-direction:column; gap:2px; font-weight:600; font-size:12.5px; color:var(--ink); }
+  .impcols small { font-weight:400; color:var(--mute); font-size:11.5px; overflow-wrap:anywhere; }
+  .imptbl { overflow-x:auto; max-height:46vh; overflow-y:auto; border:1px solid var(--line); border-radius:10px; }
+  .imptbl table { border-collapse:collapse; width:100%; font-size:13px; font-variant-numeric:tabular-nums; }
+  .imptbl th, .imptbl td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; }
+  .imptbl th { position:sticky; top:0; background:var(--soft); font:700 12px/1.2 'Barlow Condensed', sans-serif; letter-spacing:.1em; text-transform:uppercase; color:var(--mute); }
+  .imptbl td small { display:block; color:#9a6a00; font-size:11.5px; }
+  .imptbl tr.warn td { background:rgba(255,210,63,.14); }
+  .imptbl tr.skip td { color:var(--mute); text-decoration:line-through; }
+  .soon { border:1.5px dashed var(--line); border-radius:10px; padding:10px 12px; }
+  .soon b { font:800 16px/1.2 'Barlow Condensed', sans-serif; letter-spacing:.06em; text-transform:uppercase; }
+  .soon .badge { display:inline-block; margin-left:8px; font:700 11px/1 Inter, sans-serif; padding:4px 7px; border-radius:999px; background:var(--soft); color:var(--mute); vertical-align:2px; }
+  .soon p { margin:6px 0 0; color:var(--mute); font-size:13px; }
   .stepnav { position:sticky; bottom:0; z-index:20; display:flex; gap:10px; padding:12px 0 calc(12px + env(safe-area-inset-bottom, 0px)); background:var(--ground); box-shadow:0 -8px 12px -8px rgba(0,0,0,.18); }
   .stepnav .btn { flex:1; padding:16px; font-size:19px; }
   .stepnav .btn[disabled] { opacity:.35; }
@@ -256,8 +271,12 @@
   .mapbar .zoom { flex:0 0 56px; font-size:24px; padding:8px 0; }
   .abox.ours { border:3px solid #ff1f1f; background:repeating-linear-gradient(45deg, rgba(255,31,31,.85) 0 2px, rgba(255,31,31,.32) 2px 8px); }
   .abox span { white-space:nowrap; font:400 20px/1 Anton, Impact, sans-serif; color:#fff; text-transform:none; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; padding:2px 4px; text-align:center; }
-  .apark { position:absolute; transform:translate(-50%, -50%); display:flex; align-items:center; gap:6px; pointer-events:none; }
+  .apark { position:absolute; transform:translate(-17px, -50%); display:flex; align-items:center; gap:6px; pointer-events:none; }
+  .apark.mk-restroom { transform:translate(-21px, -50%); }
+  .apark.flip { flex-direction:row-reverse; transform:translate(calc(-100% + 17px), -50%); }
+  .apark.mk-restroom.flip { transform:translate(calc(-100% + 21px), -50%); }
   .apark b { width:30px; height:30px; border-radius:7px; background:#1f6fd1; border:2px solid #fff; color:#fff; font:400 22px/28px Anton, Impact, sans-serif; text-align:center; }
+  .apark.mk-restroom b { width:38px; background:#0d8a6a; font-size:17px; }
   .apark span { font:800 15px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing:.2em; color:#fff; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000; }
   .aer.editing[data-mode="box"] .apark { pointer-events:auto; cursor:move; }
   .abox.sel, .apark.sel { outline:3px dashed #ffd23f; outline-offset:2px; }
@@ -438,7 +457,7 @@ const STORE = 'gameday.v1';
 // saved state from older builds: the map pin used to be a plain label string
 function normalizeTeam(t) {
   if (!t || !t.data) return t;
-  const arr = v => Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : []);
+  const arr = v => (Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v) : [])).filter(x => x && typeof x === 'object');
   if (t.data.times) t.data.times.rows = arr(t.data.times.rows);
   if (t.data.bring) t.data.bring.items = arr(t.data.bring.items);
   if (t.data.coach) t.data.coach.list = arr(t.data.coach.list);
@@ -574,12 +593,21 @@ function boxDisp(m, bx) {
   return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
 }
 // the highlighted box is whichever label matches the event's "where" (Field 3), so the schedule drives it
-const isOurs = (m, bx) => !!bx.label && !!m.big && bx.label.trim().toLowerCase() === m.big.trim().toLowerCase();
+const isOurs = (m, bx) => !markerOf(bx.label) && !!bx.label && !!m.big && bx.label.trim().toLowerCase() === m.big.trim().toLowerCase();
+// places that aren't fields: a labeled icon instead of a rectangle
+const MARKERS = { parking: { glyph: 'P', word: 'PARKING', label: 'Parking', re: /^p(arking)?$/i }, restroom: { glyph: 'WC', word: 'RESTROOMS', label: 'Restrooms', re: /^(wc|restrooms?|bathrooms?|toilets?|porta[- ]?(john|potty)s?)$/i } };
+const markerOf = label => { const l = (label || '').trim(); for (const [key, m] of Object.entries(MARKERS)) if (m.re.test(l)) return { key, ...m }; return null; };
+function addMarker(key) {
+  const m = S.data.map, mk = MARKERS[key]; if (!m.center || !mk) return;
+  const K = Math.cos(m.center.lat * Math.PI / 180), h = 9 / K, [cx, cy] = merc(m.center.lat, m.center.lon);
+  const n = (m.boxes || []).filter(b => markerOf(b.label)).length, off = (n % 4) * 14 / K;          // new markers step aside instead of stacking
+  m.boxes = m.boxes || []; m.boxes.push({ x0: cx - h + off, y0: cy - h - off, x1: cx + h + off, y1: cy + h - off, label: mk.label });
+}
 function aerialHTML(m, editing, mode) {
   const boxes = (m.center && Array.isArray(m.boxes)) ? m.boxes : [], H = mapH(m);
   const bxs = boxes.map((bx, i) => {
     const r = boxDisp(m, bx);
-    if (/^p(arking)?$/i.test(bx.label || '')) return `<div class="apark${editing && UI.selBox === i ? ' sel' : ''}" data-box="${i}" style="left:${(r.x + r.w / 2) * 100}%;top:${(r.y + r.h / 2) * 100}%"><b>P</b><span>PARKING</span></div>`;
+    const mk = markerOf(bx.label); if (mk) return `<div class="apark mk-${mk.key}${r.x + r.w / 2 > .6 ? ' flip' : ''}${editing && UI.selBox === i ? ' sel' : ''}" data-box="${i}" style="left:clamp(22px, ${(r.x + r.w / 2) * 100}%, calc(100% - 22px));top:clamp(18px, ${(r.y + r.h / 2) * 100}%, calc(100% - 18px))"><b>${mk.glyph}</b><span>${mk.word}</span></div>`;
     const fs = Math.max(11, Math.min(26, r.w * MAPW / 3.3, r.h * H / 2.2));
     return `<div class="abox${isOurs(m, bx) ? ' ours' : ''}${editing && UI.selBox === i ? ' sel' : ''}" data-box="${i}" style="left:${r.x * 100}%;top:${r.y * 100}%;width:${r.w * 100}%;height:${r.h * 100}%"><span style="font-size:${fs.toFixed(1)}px">${esc(bx.label || '')}</span></div>`;
   }).join('');
@@ -801,26 +829,26 @@ function mixHex(a, b, t) { const A = parseInt(a.slice(1), 16), B = parseInt(b.sl
 function footerHTML(flat) {
   const d = S.data, e = d.event, deep = S.colors.deep, card = mixHex(deep, '#ffffff', .07), rule = mixHex(deep, '#ffffff', .2);
   const font = "-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif";
-  const cell = `font-family:${font};font-size:13px;font-weight:800;letter-spacing:1.5px;border-radius:9px;`, link = 'color:#ffffff;text-decoration:none;display:block;';
+  const cell = `font-family:${font};font-size:13px;font-weight:800;letter-spacing:1.5px;border-radius:9px;word-break:break-word;overflow-wrap:anywhere;`, link = 'color:#ffffff;text-decoration:none;display:block;';
   const fill = (href, t) => `<td bgcolor="#34c759" style="${cell}background:#34c759;padding:10px 14px;"><a href="${esc(href)}" style="${link}"><span style="color:#ffffff;">${esc(t)}</span></a></td>`;
   const ghost = (href, t) => `<td style="${cell}border:2px solid #7f8a91;padding:8px 12px;"><a href="${esc(href)}" style="${link}"><span style="color:#ffffff;">${esc(t)}</span></a></td>`;
   const gap = '<td width="6" style="font-size:0;line-height:0;">&nbsp;</td>';
   const buttons = (cells, align) => `<table role="presentation" cellpadding="0" cellspacing="0" align="${align}"><tr>${cells.join(gap)}</tr></table>`;
   const muted = (href, t) => `<a href="${esc(href)}" style="color:#b9c0c7;text-decoration:none;"><span style="color:#b9c0c7;">${esc(t)}</span></a>`;
-  const head = (lab, big) => `<tr><td align="left" style="padding:16px 18px 4px;font-family:${font};text-align:left;"><div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#9aa3aa;">${esc(lab.toUpperCase())}</div><div style="font-size:24px;font-weight:900;color:#ffffff;margin-top:4px;">${esc(big.toUpperCase())}</div></td></tr>`;
+  const head = (lab, big) => `<tr><td align="left" style="padding:16px 18px 4px;font-family:${font};text-align:left;"><div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#9aa3aa;">${esc(lab.toUpperCase())}</div><div style="font-size:24px;font-weight:900;color:#ffffff;margin-top:4px;word-break:break-word;overflow-wrap:anywhere;">${esc(big.toUpperCase())}</div></td></tr>`;
   const cardT = (inner, id) => `<tr data-blk="${id}"><td style="padding:0 12px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${card}" style="background:${card};border-radius:18px;">${inner}</table></td></tr>`;
   let h = '';
   if (S.on.map || S.on.link) {
     const b = [];
     if (S.on.map) b.push(fill(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.map.address.replace(/\n/g, ', '))}`, 'DIRECTIONS'));
     if (S.on.link) b.push(ghost(d.link.url, d.link.button.toUpperCase()));
-    const sub = S.on.map ? `<div style="font-size:12px;line-height:18px;margin-top:2px;color:#b9c0c7;">${esc(d.map.address.replace(/\n/g, ' · '))}</div>` : '';
-    const vol = S.on.link && d.link.vol ? `<div style="font-size:14px;font-weight:700;line-height:20px;margin-top:8px;color:#ffffff;">${esc(d.link.vol)}</div>` : '';
+    const sub = S.on.map ? `<div style="font-size:12px;line-height:18px;margin-top:2px;color:#b9c0c7;word-break:break-word;overflow-wrap:anywhere;">${esc(d.map.address.replace(/\n/g, ' · '))}</div>` : '';
+    const vol = S.on.link && d.link.vol ? `<div style="font-size:14px;font-weight:700;line-height:20px;margin-top:8px;color:#ffffff;word-break:break-word;overflow-wrap:anywhere;">${esc(d.link.vol)}</div>` : '';
     h += cardT(head(S.on.map ? 'Get there' : d.link.label, S.on.map ? e.venue : d.link.button) + `<tr><td align="left" style="padding:0 18px 16px;font-family:${font};color:#ffffff;text-align:left;">${sub}${vol}<div style="margin-top:12px;">${buttons(b, 'left')}</div></td></tr>`, S.on.link ? 'link' : 'map');
   }
   if (S.on.coach) {
     const rows = d.coach.list.map((c, i) => `<tr><td align="left" style="padding:12px 0;text-align:left;${i ? `border-top:1px solid ${rule};` : ''}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td align="left" style="font-family:${font};color:#ffffff;vertical-align:middle;text-align:left;"><div style="font-size:17px;font-weight:800;letter-spacing:.5px;">${esc(c.name.toUpperCase())}</div><div style="font-size:12px;line-height:18px;margin-top:2px;">${muted(`sms:${c.phone.replace(/\D/g, '')}`, c.phone)}<br>${muted(`mailto:${c.email}`, c.email)}</div></td>
+      <td align="left" width="100%" style="font-family:${font};color:#ffffff;vertical-align:middle;text-align:left;word-break:break-word;overflow-wrap:anywhere;"><div style="font-size:17px;font-weight:800;letter-spacing:.5px;word-break:break-word;overflow-wrap:anywhere;">${esc(c.name.toUpperCase())}</div><div style="font-size:12px;line-height:18px;margin-top:2px;word-break:break-word;overflow-wrap:anywhere;">${muted(`sms:${c.phone.replace(/\D/g, '')}`, c.phone)}<br>${muted(`mailto:${c.email}`, c.email)}</div></td>
       <td align="right" style="vertical-align:middle;white-space:nowrap;">${buttons([fill(`sms:${c.phone.replace(/\D/g, '')}`, 'TEXT'), ghost(`mailto:${c.email}`, 'EMAIL')], 'right')}</td></tr></table></td></tr>`).join('');
     h += cardT(head('Questions?', 'Text or email the coaches') + `<tr><td style="padding:4px 18px 6px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>`, 'coach');
   }
@@ -878,7 +906,7 @@ function fieldsFor(id) {
       + `<div class="fld wide"><button class="btn alt" data-act="findMap" data-id="${m.img ? 1 : 0}" style="align-self:flex-start">${m.img ? 'Find again from the address' : 'Find on map'}</button>${m.img ? '' : ''}<span id="mapStatus" class="hint" style="margin-top:4px"></span></div>`
       + (m.img && !m.own ? `<div class="fld wide"><span>${(UI.mapMode || 'box') === 'pin' ? 'Drag the pin onto the field, gym door or parking.' : UI.selBox != null ? `Moving ${esc((m.boxes[UI.selBox] || {}).label || 'box')}: the arrows move it 2 m a tap. Tap empty map when done.` : 'Add a field at true size below, or drag on the map to draw a box. Tap a box to move it with the arrows. With nothing selected the arrows move the picture.'}</span>${aerialHTML(m, true)}
           <div class="mapnav"><div class="seg" style="margin-right:6px"><button data-act="mapMode" data-id="box" aria-pressed="${(UI.mapMode || 'box') === 'box'}">Boxes</button><button data-act="mapMode" data-id="pin" aria-pressed="${UI.mapMode === 'pin'}">Pin</button></div><button class="icon" data-act="nudge" data-id="left" aria-label="Move left">&larr;</button><button class="icon" data-act="nudge" data-id="up" aria-label="Move up">&uarr;</button><button class="icon" data-act="nudge" data-id="down" aria-label="Move down">&darr;</button><button class="icon" data-act="nudge" data-id="right" aria-label="Move right">&rarr;</button><span style="width:6px"></span><button class="icon" data-act="nudge" data-id="in" aria-label="Zoom in">+</button><button class="icon" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button><button class="icon" data-act="nudge" data-id="rot" aria-label="Rotate a quarter turn">&#8635;</button><span style="width:6px"></span><div class="seg">${[['wide', 'Wide'], ['square', 'Square'], ['tall', 'Tall']].map(([k, n]) => `<button data-act="nudge" data-id="${k}" aria-pressed="${mapH(m) === { wide: 250, square: 420, tall: 700 }[k]}">${n}</button>`).join('')}</div></div>
-          <div class="row" style="margin-top:8px"><select id="fieldSize" aria-label="Field size"><option value="">Add a field at true size…</option>${FIELD_SIZES.map(f => `<option value="${f[0]}">${f[1]}</option>`).join('')}</select><button class="add" data-act="addField">Add</button></div>
+          <div class="row" style="margin-top:8px"><select id="fieldSize" aria-label="Field size"><option value="">Add a field at true size…</option>${FIELD_SIZES.map(f => `<option value="${f[0]}">${f[1]}</option>`).join('')}</select><button class="add" data-act="addField">Add</button><button class="add" data-act="addMarker" data-id="parking">+ Parking</button><button class="add" data-act="addMarker" data-id="restroom">+ Restrooms</button></div>
           ${(m.boxes || []).length ? `<div class="rows" style="margin-top:8px">${m.boxes.map((bx, i) => `<div class="row"><span class="hot" style="width:14px;height:14px;border-radius:3px;background:${isOurs(m, bx) ? '#ff1f1f' : 'transparent'};border:1.5px solid ${isOurs(m, bx) ? '#ff1f1f' : 'var(--line)'}" title="${isOurs(m, bx) ? 'Highlighted this week' : ''}"></span><input type="text" data-path="data.map.boxes.${i}.label" value="${esc(bx.label || '')}" placeholder="Label (Field 1, Parking…)" aria-label="Box label"><button class="icon" data-act="boxTurn" data-id="${i}" aria-label="Turn this box a quarter turn" title="Turn">&#8635;</button><button class="icon" data-act="boxDel" data-id="${i}" aria-label="Remove box">&times;</button></div>`).join('')}</div><p class="hint">The box whose label matches the event's field ("${esc(m.big || '')}") is highlighted. Drag a box to move it.</p>` : ''}</div>` : '')
       + ((m.boxes || []).length ? '' : F('data.map.pin.label', 'Pin label'))
       + FILE('data.map.own', 'Or upload your own parking diagram (replaces the aerial)'); }
@@ -899,7 +927,7 @@ function mapFieldsPhone() {
       : m.img ? `<div class="fld wide"><p class="tapnote">${sel != null ? `Tap the map to move <b>${esc(m.boxes[sel].label || 'this box')}</b> there.` : `Tap where you'll be.`}</p>${aerialHTML(m, true, 'tap')}
         <div class="mapbar">${sel != null
           ? `<button class="btn alt" data-act="boxTurn" data-id="${sel}">Turn</button><button class="btn alt" data-act="boxDel" data-id="${sel}">Remove</button><button class="btn" data-act="boxDone">Done</button>`
-          : `<button class="btn alt zoom" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button><button class="btn alt zoom" data-act="nudge" data-id="in" aria-label="Zoom in">+</button>${fieldKey ? `<button class="btn alt" data-act="addFieldPhone">+ Add a field</button>` : ''}`}</div></div>`
+          : `<button class="btn alt zoom" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button><button class="btn alt zoom" data-act="nudge" data-id="in" aria-label="Zoom in">+</button>${fieldKey ? `<button class="btn alt" data-act="addFieldPhone">+ Add a field</button>` : ''}<button class="btn alt" data-act="addMarker" data-id="restroom">+ Restrooms</button><button class="btn alt" data-act="addMarker" data-id="parking">+ Parking</button>`}</div></div>`
       : `<p class="hint" style="grid-column:1/-1">Type the address and the map appears here.</p>`)
     + `<details class="more" style="grid-column:1/-1"${UI.mapMore ? ' open' : ''} data-more="map"><summary>More map options</summary><div class="flds">
         ${F('data.map.label', 'Small label')}${F('data.map.big', 'Big line (this week’s field)')}
@@ -921,6 +949,7 @@ const sendPanel = () => `<div class="panel send sendp"><p class="eyebrow">Send i
     <li><div><b>Open Gmail (or Mail) and start a new message to your parent group.</b><span>The group is a one-time setup in your contacts. After that you type its name in To.</span></div></li>
     <li><div><b>Copy the email, paste it in, send.</b><span>Picture and buttons together.</span></div><button class="btn" data-act="copyPic">Copy the email</button></li>
   </ol>
+  <div class="soon"><b>Coming Soon: Scheduled Send</b><p>Game Day will email your parents by itself before each game. You get a preview first and can stop it. Part of the paid plan.</p></div>
   <div class="remind"><label for="remDays">Remind me by email</label><select id="remDays"><option>1 day before</option><option selected>2 days before</option><option>3 days before</option><option>a week before</option></select><label for="remAt">at</label><select id="remAt"><option>8:00 am</option><option selected>12:00 pm</option><option>5:00 pm</option></select></div>
   <details class="dump"><summary>What the app would store for this team</summary><pre id="dump"></pre></details></div>`;
 
@@ -975,8 +1004,8 @@ function PageNew() {
 const wkEdit = () => `<div class="rows wk-edit">${S.season.map((w, i) => `<div class="row"><input type="text" data-path="season.${i}.label" value="${esc(w.label)}" placeholder="Week / type" aria-label="Label" style="flex:0 0 84px"><input type="text" data-path="season.${i}.date" value="${esc(w.date)}" placeholder="Date" aria-label="Date"><input type="text" data-path="season.${i}.opp" value="${esc(w.opp)}" placeholder="Opponent" aria-label="Opponent"><input type="text" data-path="season.${i}.where" value="${esc(w.where)}" placeholder="Where" aria-label="Where"><button class="icon" data-act="delEvent" data-id="${i}" aria-label="Remove event">&times;</button></div>`).join('')}</div>`;
 function schedulePanel() {
   return `<div class="panel stack"><div><p class="eyebrow">Schedule</p><div class="flds">${F('seasonLabel', 'Season name')}</div><div style="margin-top:10px">${wkEdit()}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="add" data-act="addEvent">+ Add an event</button><label class="add" style="cursor:pointer">Import schedule (.xlsx / .csv)<input type="file" accept=".xlsx,.xls,.csv" data-import="schedule" hidden></label></div>
-      <p class="hint">Import reads the date, opponent, home/away and location columns. In this prototype it adds sample rows.</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="add" data-act="addEvent">+ Add an event</button>${importButtons()}</div>
+      <p class="hint">Import a CSV or Excel file, or paste rows from a spreadsheet or email. You see what it read before anything is added.</p></div>
     <div><p class="eyebrow">Parent email list</p><label class="add" style="cursor:pointer">Import email list (.xlsx / .csv)<input type="file" accept=".xlsx,.xls,.csv" data-import="emails" hidden></label>
       <p class="hint">Only needed for league auto-send. With Copy, keep the list as a contact group in your own mail app.</p></div></div>`;
 }
@@ -1001,7 +1030,7 @@ function stepFields(id) {
     <div style="margin-top:12px"><p class="eyebrow">Team colors</p>${teamFields()}</div>
     <details class="more"><summary>More options</summary><div class="flds">${F('data.event.what', 'Banner line')}${F('data.event.sub', 'Small line under the team name')}${F('data.event.ghost', 'Big background letter or number')}</div></details>`;
   if (id === '_blocks') return chips();
-  if (id === '_schedule') return `${wkEdit()}<button class="add" data-act="addEvent" style="margin-top:8px">+ Add a game</button>`;
+  if (id === '_schedule') return `<div style="display:flex;gap:8px;flex-wrap:wrap">${importButtons()}</div>${wkEdit()}<button class="add" data-act="addEvent" style="margin-top:8px">+ Add a game</button>`;
   return `<div class="flds">${fieldsFor(id)}</div>`;
 }
 function PageSetupSteps() {
@@ -1089,6 +1118,200 @@ function newFrom(id) {
   else { t = preset(id); t.season = []; t.seasonLabel = 'New season'; }
   APP.teams.push(t); APP.ti = APP.teams.length - 1; go('setup');
 }
+/* IMPORT-START: schedule import. Pure functions (no DOM) so they can be tested on their own. */
+const IMP_FIELDS = [['skip', 'Ignore'], ['label', 'Week / game'], ['date', 'Date'], ['time', 'Time'], ['opp', 'Opponent'], ['ha', 'Home / away'], ['where', 'Field / court'], ['venue', 'Place'], ['address', 'Address']];
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// CSV / TSV / semicolon, with quoted cells; the delimiter is whichever appears most consistently
+function impSplit(text) {
+  text = String(text || '').replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+  const sample = text.split('\n').filter(l => l.trim()).slice(0, 8);
+  const score = d => { const c = sample.map(l => l.split(d).length - 1); return c.length && Math.min(...c) > 0 ? c.reduce((a, b) => a + b, 0) : 0; };
+  const delim = ['\t', ';', ','].map(d => [d, score(d)]).sort((a, b) => b[1] - a[1])[0];
+  const D = delim[1] ? delim[0] : null;
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; continue; }
+    if (ch === '"' && cell.trim() === '') { q = true; cell = ''; continue; }
+    if (D && ch === D) { row.push(cell); cell = ''; continue; }
+    if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; continue; }
+    cell += ch;
+  }
+  row.push(cell); rows.push(row);
+  // no delimiter at all (a pasted email): split each line on 2+ spaces or " - " / " | "
+  const out = rows.map(r => r.map(c => c.trim()));
+  if (!D) return out.map(r => r[0].split(/\s{2,}|\s+[|–—-]\s+/).map(c => c.trim()));
+  return out;
+}
+
+const isDateLike = v => impDate(v, new Date(2026, 8, 1)) != null;
+const isTimeLike = v => /^\s*0?\.\d+\s*$/.test(v || '') || (/^\s*\d{1,2}(:\d{2})?\s*(a|p|am|pm|a\.m\.|p\.m\.)?\s*$/i.test(v || '') && /[:apAP]|^\s*\d{3,4}\s*$/.test(v || ''));
+const isHA = v => /^\s*(h|a|home|away|@|vs\.?|v\.?)\s*$/i.test(v || '');
+
+// Parse a date cell. Returns a Date or null. Year-less dates land on the year that puts them nearest the season.
+function impDate(v, today) {
+  v = String(v == null ? '' : v).trim(); if (!v) return null;
+  today = today || new Date();
+  const wdm = v.match(/\b(sun|mon|tue|wed|thu|fri|sat)[a-z]*\.?\b/i), wd = wdm ? ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(wdm[1].toLowerCase()) : -1;
+  const pick = (m, d, y) => {
+    if (m < 0 || m > 11 || d < 1 || d > 31) return null;
+    if (y != null) { if (y < 100) y += 2000; const dt = new Date(y, m, d); return dt.getMonth() === m ? dt : null; }
+    let cands = [today.getFullYear() - 1, today.getFullYear(), today.getFullYear() + 1].map(yy => new Date(yy, m, d)).filter(dt => dt.getMonth() === m);
+    if (wd >= 0 && cands.some(dt => dt.getDay() === wd)) cands = cands.filter(dt => dt.getDay() === wd);
+    return cands.sort((a, b) => Math.abs(a - today - 1e10) - Math.abs(b - today - 1e10))[0];   // bias ~4 months ahead: a season
+  };
+  let m;
+  if (/^\d{5}(\.\d+)?$/.test(v)) { const n = +v; if (n > 30000 && n < 60000) { const dt = new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 864e5); return new Date(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()); } }
+  if ((m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return pick(+m[2] - 1, +m[3], +m[1]);
+  if ((m = v.match(/(?:^|\D)(\d{1,2})[\/.](\d{1,2})(?:[\/.](\d{2,4}))?(?!\d)/))) return pick(+m[1] - 1, +m[2], m[3] != null ? +m[3] : null);
+  if ((m = v.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?!\d)(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?/i))) return pick(MONTHS.indexOf(m[1].slice(0, 3).toLowerCase()), +m[2], m[3] ? +m[3] : null);
+  if ((m = v.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?(?:,?\s+(\d{4}))?/i))) return pick(MONTHS.indexOf(m[2].slice(0, 3).toLowerCase()), +m[1], m[3] ? +m[3] : null);
+  return null;
+}
+const impFmtDate = dt => `${WD[dt.getDay()]} · ${MO[dt.getMonth()]} ${dt.getDate()}`;
+
+// "1:30p", "1330", "11:30 AM", Excel day-fractions → "1:30 PM" style; blank stays blank
+function impTime(v) {
+  v = String(v == null ? '' : v).trim(); if (!v) return '';
+  if (/^0?\.\d+$/.test(v)) { const mins = Math.round(+v * 1440); v = `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`; }
+  const m = v.match(/^(\d{1,2})(?::?(\d{2}))?\s*(a|p|am|pm|a\.m\.|p\.m\.)?$/i); if (!m) return v;
+  let h = +m[1], mm = m[2] || '00'; const ap = m[3] ? m[3][0].toLowerCase() : null;
+  if (!ap && h > 12) { const suf = 'PM'; h -= 12; return `${h}:${mm} ${suf}`; }
+  if (ap) return `${h}:${mm} ${ap === 'p' ? 'PM' : 'AM'}`;
+  return `${h}:${mm}`;
+}
+
+// Which column is which: headers first, then what the cells look like
+function impGuess(rows) {
+  const width = Math.max(...rows.map(r => r.length));
+  const head = rows[0] || [];
+  const H = { label: /^(wk|week|game|gm|#|no\.?|round|rd|event)\b/i, date: /\b(date|day)\b/i, time: /\b(time|start|kick|tip|first|warm)/i, ha: /\b(home\s*\/\s*away|h\s*\/\s*a|home|away|side)\b/i, opp: /\b(opponent|opp|vs|versus|against|visitor|visiting|away team|playing)\b/i, where: /\b(field|court|mat|pitch|diamond|rink|gym)\b/i, venue: /\b(location|venue|site|park|facility|place|where)\b/i, address: /\b(address|street)\b/i };
+  const headerHits = head.filter(c => Object.values(H).some(re => re.test(c || ''))).length;
+  const bodyDates = rows.slice(1, 7).filter(r => r.some(isDateLike)).length;
+  const hasHeader = (headerHits >= 2 && !head.some(isDateLike)) || (!head.some(c => /\d/.test(c || '')) && head.filter(c => (c || '').trim()).length >= 2 && bodyDates >= Math.min(2, rows.length - 1));
+  const body = hasHeader ? rows.slice(1) : rows;
+  const map = Array(width).fill('skip'), used = new Set();
+  if (hasHeader) {
+    const order = ['address', 'date', 'time', 'ha', 'opp', 'where', 'venue', 'label'];
+    for (const f of order) for (let i = 0; i < width; i++) if (map[i] === 'skip' && !used.has(f) && H[f].test(head[i] || '')) { map[i] = f; used.add(f); break; }
+    // "Home" and "Away" as two team columns: whichever isn't us is the opponent (handled at build time)
+    const hi = head.findIndex(c => /^home( team)?$/i.test(c || '')), ai = head.findIndex(c => /^(away|visitor|visiting)( team)?$/i.test(c || ''));
+    if (hi >= 0 && ai >= 0) { map[hi] = 'homeTeam'; map[ai] = 'awayTeam'; used.add('ha'); used.add('opp'); }
+  }
+  const frac = (i, fn) => { const cells = body.map(r => r[i]).filter(c => (c || '').trim()); return cells.length ? cells.filter(fn).length / cells.length : 0; };
+  for (let i = 0; i < width; i++) {
+    if (map[i] !== 'skip') continue;
+    if (!used.has('date') && frac(i, isDateLike) > .6) { map[i] = 'date'; used.add('date'); continue; }
+    if (!used.has('time') && frac(i, isTimeLike) > .6) { map[i] = 'time'; used.add('time'); continue; }
+    if (!used.has('ha') && frac(i, isHA) > .6) { map[i] = 'ha'; used.add('ha'); continue; }
+  }
+  // a date cell that also carries the time ("Sat 9/27 11:30 AM") covers the time too
+  for (let i = 0; i < width; i++) {
+    if (map[i] !== 'skip') continue;
+    const txt = frac(i, c => /[a-z]/i.test(c) && !isDateLike(c) && !isTimeLike(c));
+    if (txt > .5) { const f = ['opp', 'where', 'venue'].find(x => !used.has(x)); if (f) { map[i] = f; used.add(f); } }
+  }
+  for (let i = 0; i < width; i++) if (map[i] === 'venue' && !map.includes('where') && frac(i, c => /^(field|court|mat|pitch|gym|diamond|rink)\s*#?\d+\b/i.test(c)) > .6) map[i] = 'where';
+  return { hasHeader, map };
+}
+
+// Rows → events. Each event: {label, date, dateOK, time, opp, home, where, venue, address, skip, why}
+function impBuild(rows, guess, opts) {
+  opts = opts || {}; const today = opts.today || new Date(), team = (opts.team || '').toLowerCase().trim();
+  const body = guess.hasHeader ? rows.slice(1) : rows, out = [];
+  body.forEach(r => {
+    if (!r.some(c => (c || '').trim())) return;
+    const ev = { label: '', date: '', dateOK: false, time: '', opp: '', home: true, where: '', venue: '', address: '', skip: false, why: '' };
+    guess.map.forEach((f, i) => {
+      const v = (r[i] || '').trim(); if (!v || f === 'skip') return;
+      if (f === 'date') { const dt = impDate(v, today); if (dt) { ev.date = impFmtDate(dt); ev.dateOK = true; ev._t = dt.getTime(); const tm = v.match(/(\d{1,2}:\d{2}\s*(?:[ap]\.?m?\.?)?)\s*$/i); if (tm && !ev.time) ev.time = impTime(tm[1]); } else ev.date = v; }
+      else if (f === 'time') ev.time = impTime(v);
+      else if (f === 'ha') ev.home = !/^\s*(a|away|@|at)\b/i.test(v);
+      else if (f === 'opp') { let o = v; if (/^\s*(@|at\s)/i.test(o)) { ev.home = false; o = o.replace(/^\s*(@|at)\s*/i, ''); } else if (/^\s*(vs\.?|v\.?)\s/i.test(o)) { ev.home = true; o = o.replace(/^\s*(vs\.?|v\.?)\s*/i, ''); } ev.opp = o; }
+      else if (f === 'homeTeam' || f === 'awayTeam') { ev[f] = v; }
+      else if (f === 'label') ev.label = /^\d+$/.test(v) ? `${opts.sport === 'basketball' ? 'Game' : 'Week'} ${v}` : v;
+      else if (f === 'where') ev.where = /^\d+$/.test(v) ? `${opts.sport === 'basketball' ? 'Court' : 'Field'} ${v}` : v;
+      else ev[f] = v;
+    });
+    if (ev.homeTeam || ev.awayTeam) {
+      const us = s => team && (s || '').toLowerCase().includes(team);
+      if (us(ev.awayTeam) && !us(ev.homeTeam)) { ev.home = false; ev.opp = ev.homeTeam || ''; } else { ev.home = true; ev.opp = us(ev.homeTeam) ? (ev.awayTeam || '') : `${ev.homeTeam || ''} vs ${ev.awayTeam || ''}`.trim(); }
+      delete ev.homeTeam; delete ev.awayTeam;
+    }
+    const all = r.join(' ');
+    if (/\b(bye|no games?|off week|cancel+ed|holiday|no practice)\b/i.test(all)) { ev.skip = true; ev.why = 'Bye / no game'; }
+    else if (!ev.dateOK && !ev.opp && !ev.time) { ev.skip = true; ev.why = 'Nothing usable'; }
+    else if (!ev.dateOK) ev.why = 'Check the date';
+    out.push(ev);
+  });
+  // sort by date when every kept row has one; number the labels if the file had none
+  const kept = out.filter(e => !e.skip);
+  if (kept.length && kept.every(e => e._t != null)) out.sort((a, b) => (a._t || 0) - (b._t || 0));
+  let n = opts.startAt || 1;
+  out.forEach(e => { if (!e.skip && !e.label) e.label = `${opts.sport === 'basketball' ? 'Game' : opts.sport === 'wrestling' ? 'Meet' : 'Week'} ${n}`; if (!e.skip) n++; delete e._t; });
+  return out;
+}
+/* IMPORT-END */
+
+// ---- the import screen: what it read, a dropdown per column to fix a wrong guess, then Add or Replace ----
+const IMP_OPTS = [...IMP_FIELDS, ['homeTeam', 'Home team'], ['awayTeam', 'Away team']];
+function impOpen(rows) {
+  rows = rows.map(r => r.map(c => String(c == null ? '' : c).trim())).filter(r => r.some(c => c));
+  if (!rows.length) { impShow('<p class="eyebrow">Nothing to read</p><p style="margin:0">That file or paste had no rows in it.</p>', true); return; }
+  UI.imp = { rows, guess: impGuess(rows) }; impRender();
+}
+function impEvents() { const I = UI.imp; return impBuild(I.rows, I.guess, { sport: S.sport, team: S.data.event.team, startAt: I.replace ? 1 : S.season.length + 1 }); }
+function impShow(html, closeOnly) { $('#overlay').innerHTML = `<div class="ov"><div class="box imp">${html}${closeOnly ? '<div style="margin-top:12px"><button class="btn" data-act="closeOv">Close</button></div>' : ''}</div></div>`; }
+function impRender() {
+  const I = UI.imp, ev = impEvents(), keep = ev.filter(e => !e.skip), width = I.guess.map.length;
+  const sample = (I.guess.hasHeader ? I.rows.slice(1) : I.rows).slice(0, 3);
+  const cols = `<div class="impcols">${I.guess.map.map((f, i) => `<label class="fld"><span>${I.guess.hasHeader ? esc(I.rows[0][i] || `Column ${i + 1}`) : `Column ${i + 1}`}<small>${esc(sample.map(r => r[i] || '').filter(Boolean).slice(0, 2).join(' · ')).slice(0, 40)}</small></span><select data-imp-col="${i}" aria-label="What column ${i + 1} is">${IMP_OPTS.map(([v, n]) => `<option value="${v}"${f === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`).join('')}</div>`;
+  const tbl = `<div class="imptbl"><table><thead><tr><th></th><th>Game</th><th>Date</th><th>Time</th><th>Opponent</th><th>Home?</th><th>Field / place</th></tr></thead><tbody>${ev.slice(0, 60).map(e => `<tr class="${e.skip ? 'skip' : e.why ? 'warn' : ''}"><td>${e.skip ? '–' : e.why ? '!' : '✓'}</td><td>${esc(e.label)}</td><td>${esc(e.date)}</td><td>${esc(e.time)}</td><td>${esc(e.opp)}</td><td>${e.skip ? '' : e.home ? 'Home' : 'Away'}</td><td>${esc(e.where || e.venue)}${e.why ? `<small>${esc(e.why)}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  const warn = keep.filter(e => e.why).length;
+  impShow(`<p class="eyebrow">Here is what I read</p>
+    <p style="margin:0 0 10px">${keep.length} game${keep.length === 1 ? '' : 's'}${warn ? `, ${warn} to check (marked !)` : ''}${ev.length - keep.length ? `, ${ev.length - keep.length} skipped` : ''}. If a column is wrong, change it here:</p>
+    ${cols}${tbl}
+    <div class="send" style="margin-top:12px"><div class="btns">
+      <button class="btn" data-act="impApply" data-id="add"${keep.length ? '' : ' disabled'}>Add ${keep.length} game${keep.length === 1 ? '' : 's'}</button>
+      ${S.season.length ? `<button class="btn alt" data-act="impApply" data-id="replace"${keep.length ? '' : ' disabled'}>Replace my ${S.season.length} games</button>` : ''}
+      <button class="btn alt" data-act="impCancel">Cancel</button></div></div>
+    <p class="hint" style="margin-top:8px">Nothing changes until you tap Add. Every game can be edited afterwards.</p>`);
+}
+function impApply(mode) {
+  const I = UI.imp; if (!I) return;
+  I.replace = mode === 'replace'; const ev = impEvents().filter(e => !e.skip);
+  if (I.replace) S.season = [];
+  const hot = (S.data.times.rows || []).findIndex(r => r.hot);
+  ev.forEach(e => {
+    const times = (S.data.times.rows || []).map(x => ({ ...x }));
+    if (e.time && times.length) times[hot >= 0 ? hot : times.length - 1].time = e.time;
+    const last = S.season[S.season.length - 1];
+    S.season.push({ label: e.label, date: e.date, opp: e.opp, home: e.home, where: e.where || (last ? last.where : ''), venue: e.venue || (last && last.venue) || undefined, address: e.address || (last && last.address) || undefined, times });
+  });
+  UI.imp = null; $('#overlay').innerHTML = '';
+  applyEvent(Math.max(0, S.season.findIndex(w => !w.sent))); render();
+}
+function impPasteBox() {
+  impShow(`<p class="eyebrow">Paste a schedule</p><p style="margin:0">Copy the rows from a spreadsheet, a league website or an email, and paste them here. One game per line.</p>
+    <textarea id="impPaste" rows="8" style="margin-top:10px;font-size:14px" placeholder="Sat 9/12   9:00   vs Blue Thunder   Field 4"></textarea>
+    <div class="send" style="margin-top:10px"><div class="btns"><button class="btn" data-act="impReadPaste">Read it</button><button class="btn alt" data-act="impCancel">Cancel</button></div></div>`);
+  setTimeout(() => { const t = $('#impPaste'); if (t) t.focus(); }, 30);
+}
+// Excel files are read in the browser; the reader loads only when someone picks one
+function loadXLSX() { return window.XLSX ? Promise.resolve() : new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload = res; sc.onerror = () => rej(new Error('Could not load the Excel reader')); document.head.appendChild(sc); }); }
+async function impFile(file) {
+  try {
+    if (/\.(xlsx|xls|xlsm|ods)$/i.test(file.name)) {
+      impShow('<p class="eyebrow">Reading the spreadsheet…</p>');
+      await loadXLSX();
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+      impOpen(XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }));
+    } else impOpen(impSplit(await file.text()));
+  } catch (e) { impShow(`<p class="eyebrow">Could not read that file</p><p style="margin:0">${esc(e.message || '')}. Try saving it as CSV, or open it and paste the rows instead.</p>`, true); }
+}
+const importButtons = () => `<label class="add" style="cursor:pointer">Import a schedule file<input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods" data-import="schedule" hidden></label><button class="add" data-act="impPaste">Paste a schedule</button>`;
 function addEvent(rows) {
   const last = S.season[S.season.length - 1];
   (rows || [{}]).forEach((r, k) => S.season.push({ label: S.sport === 'flag' ? `Week ${S.season.length + 1}` : 'Dual Meet', date: '', opp: '', home: true, where: last ? last.where : '', venue: last && last.venue, address: last && last.address, ...r, times: S.data.times.rows.map(x => ({ ...x })) }));
@@ -1131,6 +1354,7 @@ document.addEventListener('click', ev => {
   else if (act === 'teamLink') return teamLink();
   else if (act === 'findMap') return findOnMap(id === '1');
   else if (act === 'boxDone') UI.selBox = null;
+  else if (act === 'addMarker') { addMarker(id); if (!twoPane()) UI.selBox = S.data.map.boxes.length - 1; }
   else if (act === 'addFieldPhone') { const k = SPORT_FIELD[S.sport]; if (k) { addField(k); UI.selBox = S.data.map.boxes.length - 1; } }
   else if (act === 'nudge') return nudgeMap(id);
   else if (act === 'mapMode') UI.mapMode = id;
@@ -1138,6 +1362,10 @@ document.addEventListener('click', ev => {
   else if (act === 'boxTurn') { const bx = S.data.map.boxes[+id], cx = (bx.x0 + bx.x1) / 2, cy = (bx.y0 + bx.y1) / 2, w = bx.x1 - bx.x0, h = bx.y1 - bx.y0; bx.x0 = cx - h / 2; bx.x1 = cx + h / 2; bx.y0 = cy - w / 2; bx.y1 = cy + w / 2; }
   else if (act === 'addField') { const sel = $('#fieldSize'); if (sel && sel.value) { addField(sel.value); UI.selBox = S.data.map.boxes.length - 1; } }
   else if (act === 'copyLink') { const o = $('#linkOut'); try { navigator.clipboard.writeText(o.value).then(() => { b.textContent = 'Copied'; }, () => o.select()); } catch (e) { o.select(); } return; }
+  else if (act === 'impPaste') return impPasteBox();
+  else if (act === 'impReadPaste') { const t = $('#impPaste'); return impOpen(impSplit(t ? t.value : '')); }
+  else if (act === 'impApply') return impApply(id);
+  else if (act === 'impCancel') { UI.imp = null; $('#overlay').innerHTML = ''; return; }
   else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
   render();
   if (act === 'step') window.scrollTo(0, 0);
@@ -1177,13 +1405,8 @@ document.addEventListener('input', ev => {
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
-  if (t.dataset.import === 'schedule' && t.files[0]) {
-    // stand-in for the real parser: the file is accepted and sample rows appear in the editable list
-    addEvent(S.sport === 'flag'
-      ? [{ date: 'Sun · Oct 25', opp: 'Chiefs', home: true, where: 'Field 2' }, { date: 'Sun · Nov 1', opp: 'Bills', home: false, where: 'Field 1' }]
-      : [{ label: 'Tri Meet', date: 'Sat · Jan 9', opp: 'Wootton', home: false, where: 'Main Gym', venue: 'Wootton HS', address: 'Wootton High School\n2100 Wootton Pkwy\nRockville, MD' }]);
-    render(); return;
-  }
+  if (t.dataset.import === 'schedule' && t.files[0]) { impFile(t.files[0]); t.value = ''; return; }
+  if (t.dataset.impCol != null && UI.imp) { UI.imp.guess.map[+t.dataset.impCol] = t.value; impRender(); return; }
   if (t.dataset.import === 'emails' && t.files[0]) { overlay(`<p class="eyebrow">Email list received</p><p style="margin:0">${esc(t.files[0].name)}. The real app reads the parent email columns and keeps them for league auto-send only. Nothing is stored in this prototype.</p>`); t.value = ''; return; }
   if (!t.dataset.file || !t.files[0]) return;
   const path = t.dataset.file;
