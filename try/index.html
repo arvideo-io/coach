@@ -142,6 +142,8 @@
   .impcols { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; margin-bottom:10px; }
   .impcols span { display:flex; flex-direction:column; gap:2px; font-weight:600; font-size:12.5px; color:var(--ink); }
   .impcols small { font-weight:400; color:var(--mute); font-size:11.5px; overflow-wrap:anywhere; }
+  .impus { margin:0 0 10px; }
+  .impus.ask { border:2px solid #ffd23f; border-radius:10px; padding:8px 10px; background:rgba(255,210,63,.1); }
   .imptbl { overflow-x:auto; max-height:46vh; overflow-y:auto; border:1px solid var(--line); border-radius:10px; }
   .imptbl table { border-collapse:collapse; width:100%; font-size:13px; font-variant-numeric:tabular-nums; }
   .imptbl th, .imptbl td { text-align:left; padding:7px 9px; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; }
@@ -1236,7 +1238,8 @@ function impBuild(rows, guess, opts) {
       else ev[f] = v;
     });
     if (ev.homeTeam || ev.awayTeam) {
-      const us = s => team && (s || '').toLowerCase().includes(team);
+      const pick = (opts.us || '').toLowerCase().trim();
+      const us = s => pick ? (s || '').toLowerCase().trim() === pick : team && (s || '').toLowerCase().includes(team);
       if (us(ev.awayTeam) && !us(ev.homeTeam)) { ev.home = false; ev.opp = ev.homeTeam || ''; } else { ev.home = true; ev.opp = us(ev.homeTeam) ? (ev.awayTeam || '') : `${ev.homeTeam || ''} vs ${ev.awayTeam || ''}`.trim(); }
       delete ev.homeTeam; delete ev.awayTeam;
     }
@@ -1253,6 +1256,16 @@ function impBuild(rows, guess, opts) {
   out.forEach(e => { if (!e.skip && !e.label) e.label = `${opts.sport === 'basketball' ? 'Game' : opts.sport === 'wrestling' ? 'Meet' : 'Week'} ${n}`; if (!e.skip) n++; delete e._t; });
   return out;
 }
+// Team names in Home/Away team columns, and whether picking "us" by name is ambiguous (two "Eagles" teams)
+function impTeams(rows, guess, team) {
+  const body = guess.hasHeader ? rows.slice(1) : rows, cols = guess.map.map((f, i) => (f === 'homeTeam' || f === 'awayTeam') ? i : -1).filter(i => i >= 0);
+  if (!cols.length) return null;
+  const names = [...new Set(body.flatMap(r => cols.map(i => (r[i] || '').trim())).filter(Boolean))].sort();
+  const words = (team || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = names.filter(n => words.length && words.every(w => n.toLowerCase().includes(w)));
+  const exact = names.filter(n => n.toLowerCase() === (team || '').toLowerCase().trim());
+  return { names, hits, auto: exact.length === 1 ? exact[0] : hits.length === 1 ? hits[0] : '' };
+}
 /* IMPORT-END */
 
 // ---- the import screen: what it read, a dropdown per column to fix a wrong guess, then Add or Replace ----
@@ -1260,22 +1273,31 @@ const IMP_OPTS = [...IMP_FIELDS, ['homeTeam', 'Home team'], ['awayTeam', 'Away t
 function impOpen(rows) {
   rows = rows.map(r => r.map(c => String(c == null ? '' : c).trim())).filter(r => r.some(c => c));
   if (!rows.length) { impShow('<p class="eyebrow">Nothing to read</p><p style="margin:0">That file or paste had no rows in it.</p>', true); return; }
-  UI.imp = { rows, guess: impGuess(rows) }; impRender();
+  const guess = impGuess(rows), tm = impTeams(rows, guess, S.data.event.team);
+  UI.imp = { rows, guess, us: tm ? tm.auto : '' }; impRender();
 }
-function impEvents() { const I = UI.imp; return impBuild(I.rows, I.guess, { sport: S.sport, team: S.data.event.team, startAt: I.replace ? 1 : S.season.length + 1 }); }
+function impEvents() {
+  const I = UI.imp, ev = impBuild(I.rows, I.guess, { sport: S.sport, team: S.data.event.team, us: I.us, startAt: I.replace ? 1 : S.season.length + 1 });
+  // times follow the template: no AM/PM if the coach's own times don't use it
+  const tpl = ((S.data.times.rows || []).find(r => r.hot) || (S.data.times.rows || [])[0] || {}).time || '';
+  if (!/[ap]\.?m/i.test(tpl)) ev.forEach(e => { e.time = (e.time || '').replace(/\s*[AP]\.?M\.?$/i, ''); });
+  return ev;
+}
 function impShow(html, closeOnly) { $('#overlay').innerHTML = `<div class="ov"><div class="box imp">${html}${closeOnly ? '<div style="margin-top:12px"><button class="btn" data-act="closeOv">Close</button></div>' : ''}</div></div>`; }
 function impRender() {
   const I = UI.imp, ev = impEvents(), keep = ev.filter(e => !e.skip), width = I.guess.map.length;
   const sample = (I.guess.hasHeader ? I.rows.slice(1) : I.rows).slice(0, 3);
   const cols = `<div class="impcols">${I.guess.map.map((f, i) => `<label class="fld"><span>${I.guess.hasHeader ? esc(I.rows[0][i] || `Column ${i + 1}`) : `Column ${i + 1}`}<small>${esc(sample.map(r => r[i] || '').filter(Boolean).slice(0, 2).join(' · ')).slice(0, 40)}</small></span><select data-imp-col="${i}" aria-label="What column ${i + 1} is">${IMP_OPTS.map(([v, n]) => `<option value="${v}"${f === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`).join('')}</div>`;
   const tbl = `<div class="imptbl"><table><thead><tr><th></th><th>Game</th><th>Date</th><th>Time</th><th>Opponent</th><th>Home?</th><th>Field / place</th></tr></thead><tbody>${ev.slice(0, 60).map(e => `<tr class="${e.skip ? 'skip' : e.why ? 'warn' : ''}"><td>${e.skip ? '–' : e.why ? '!' : '✓'}</td><td>${esc(e.label)}</td><td>${esc(e.date)}</td><td>${esc(e.time)}</td><td>${esc(e.opp)}</td><td>${e.skip ? '' : e.home ? 'Home' : 'Away'}</td><td>${esc(e.where || e.venue)}${e.why ? `<small>${esc(e.why)}</small>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  const tm = impTeams(I.rows, I.guess, S.data.event.team), needUs = tm && !I.us;
+  const usQ = tm ? `<div class="impus${needUs ? ' ask' : ''}"><label class="fld"><span>Which one is your team?</span><select data-imp-us aria-label="Which one is your team"><option value="">Choose…</option>${(tm.hits.length ? [...tm.hits, ...tm.names.filter(n => !tm.hits.includes(n))] : tm.names).map(n => `<option${I.us === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>${needUs ? '<p class="hint" style="margin:4px 0 0">This schedule lists more than one team that could be yours. Pick it and the home and away games sort themselves out.</p>' : ''}</div>` : '';
   const warn = keep.filter(e => e.why).length;
   impShow(`<p class="eyebrow">Here is what I read</p>
     <p style="margin:0 0 10px">${keep.length} game${keep.length === 1 ? '' : 's'}${warn ? `, ${warn} to check (marked !)` : ''}${ev.length - keep.length ? `, ${ev.length - keep.length} skipped` : ''}. If a column is wrong, change it here:</p>
-    ${cols}${tbl}
+    ${usQ}${cols}${tbl}
     <div class="send" style="margin-top:12px"><div class="btns">
-      <button class="btn" data-act="impApply" data-id="add"${keep.length ? '' : ' disabled'}>Add ${keep.length} game${keep.length === 1 ? '' : 's'}</button>
-      ${S.season.length ? `<button class="btn alt" data-act="impApply" data-id="replace"${keep.length ? '' : ' disabled'}>Replace my ${S.season.length} games</button>` : ''}
+      <button class="btn" data-act="impApply" data-id="add"${keep.length && !needUs ? '' : ' disabled'}>Add ${keep.length} game${keep.length === 1 ? '' : 's'}</button>
+      ${S.season.length ? `<button class="btn alt" data-act="impApply" data-id="replace"${keep.length && !needUs ? '' : ' disabled'}>Replace my ${S.season.length} games</button>` : ''}
       <button class="btn alt" data-act="impCancel">Cancel</button></div></div>
     <p class="hint" style="margin-top:8px">Nothing changes until you tap Add. Every game can be edited afterwards.</p>`);
 }
@@ -1406,6 +1428,7 @@ document.addEventListener('input', ev => {
 document.addEventListener('change', ev => {
   const t = ev.target;
   if (t.dataset.import === 'schedule' && t.files[0]) { impFile(t.files[0]); t.value = ''; return; }
+  if (t.dataset.impUs != null && UI.imp) { UI.imp.us = t.value; impRender(); return; }
   if (t.dataset.impCol != null && UI.imp) { UI.imp.guess.map[+t.dataset.impCol] = t.value; impRender(); return; }
   if (t.dataset.import === 'emails' && t.files[0]) { overlay(`<p class="eyebrow">Email list received</p><p style="margin:0">${esc(t.files[0].name)}. The real app reads the parent email columns and keeps them for league auto-send only. Nothing is stored in this prototype.</p>`); t.value = ''; return; }
   if (!t.dataset.file || !t.files[0]) return;
