@@ -143,6 +143,10 @@
   .impcols span { display:flex; flex-direction:column; gap:2px; font-weight:600; font-size:12.5px; color:var(--ink); }
   .impcols small { font-weight:400; color:var(--mute); font-size:11.5px; overflow-wrap:anywhere; }
   .impus { margin:0 0 10px; }
+  .pickrow { display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:8px; }
+  .picktile { background:#062226; border:3px solid transparent; border-radius:12px; padding:8px 6px 6px; display:flex; flex-direction:column; align-items:center; gap:6px; min-height:150px; color:#fff; font:700 13px/1 'Barlow Condensed', sans-serif; letter-spacing:.1em; text-transform:uppercase; }
+  .picktile.on { border-color:#ffd23f; }
+  .picktile img { max-width:100%; max-height:190px; border:0; margin:0; flex:1; object-fit:contain; }
   .impwarn { margin:0 0 10px; padding:8px 10px; border-radius:10px; border:2px solid #ffd23f; background:rgba(255,210,63,.1); font-size:13.5px; }
   .impus.ask { border:2px solid #ffd23f; border-radius:10px; padding:8px 10px; background:rgba(255,210,63,.1); }
   .imptbl { overflow-x:auto; max-height:46vh; overflow-y:auto; border:1px solid var(--line); border-radius:10px; }
@@ -672,7 +676,7 @@ async function fetchSquare(lat, lon, span) {
 // Cut a shirt out of a photo on a plain background. No service, no model: the background is whatever
 // color fills the edges; it is flooded inward while the color stays close AND changes smoothly, so a white
 // shirt on white stops at its seam shading. A busy background (a kid on a field) is left alone.
-async function cutoutPhoto(dataUrl) {
+async function cutoutStrict(dataUrl) {
   const im = await loadImg(dataUrl), sc = Math.min(1, 900 / Math.max(im.width, im.height));
   const W = Math.max(1, Math.round(im.width * sc)), H = Math.max(1, Math.round(im.height * sc));
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -683,15 +687,14 @@ async function cutoutPhoto(dataUrl) {
   const bg = [med(0), med(1), med(2)];
   const toBg = k => Math.hypot(px[k * 4] - bg[0], px[k * 4 + 1] - bg[1], px[k * 4 + 2] - bg[2]);
   const step = (a, b) => Math.abs(px[a * 4] - px[b * 4]) + Math.abs(px[a * 4 + 1] - px[b * 4 + 1]) + Math.abs(px[a * 4 + 2] - px[b * 4 + 2]);
-  const T = 30, S = 8, seen = new Uint8Array(N), q = [];
-  if (border.filter(k => toBg(k) > T).length / border.length > .25) return { url: dataUrl, cut: false };
+  const T = 30, S = 8, TP = 30, seen = new Uint8Array(N), q = [];
   for (const k of border) if (!seen[k] && toBg(k) < T) { seen[k] = 1; q.push(k); }
   while (q.length) {
     const k = q.pop(), x0 = k % W, y0 = (k / W) | 0;
-    if (x0 > 0) { const n = k - 1; if (!seen[n] && toBg(n) < T && step(k, n) < S) { seen[n] = 1; q.push(n); } }
-    if (x0 < W - 1) { const n = k + 1; if (!seen[n] && toBg(n) < T && step(k, n) < S) { seen[n] = 1; q.push(n); } }
-    if (y0 > 0) { const n = k - W; if (!seen[n] && toBg(n) < T && step(k, n) < S) { seen[n] = 1; q.push(n); } }
-    if (y0 < H - 1) { const n = k + W; if (!seen[n] && toBg(n) < T && step(k, n) < S) { seen[n] = 1; q.push(n); } }
+    if (x0 > 0) { const n = k - 1; if (!seen[n] && toBg(n) < TP && step(k, n) < S) { seen[n] = 1; q.push(n); } }
+    if (x0 < W - 1) { const n = k + 1; if (!seen[n] && toBg(n) < TP && step(k, n) < S) { seen[n] = 1; q.push(n); } }
+    if (y0 > 0) { const n = k - W; if (!seen[n] && toBg(n) < TP && step(k, n) < S) { seen[n] = 1; q.push(n); } }
+    if (y0 < H - 1) { const n = k + W; if (!seen[n] && toBg(n) < TP && step(k, n) < S) { seen[n] = 1; q.push(n); } }
   }
   // islands: keep the shirt (the big pieces), drop leftover specks of background
   const lab = new Int32Array(N), sizes = [0]; let nl = 0;
@@ -706,7 +709,7 @@ async function cutoutPhoto(dataUrl) {
   for (let k = 0; k < N; k++) if (!seen[k] && sizes[lab[k]] < biggest * .03) seen[k] = 1;
   let removed = 0; for (let k = 0; k < N; k++) removed += seen[k];
   const frac = removed / N;
-  if (frac < .08 || frac > .96) return { url: dataUrl, cut: false };
+  if (frac < .04 || frac > .97) return { url: dataUrl, cut: false };
   const isEdge = k => { const x0 = k % W, y0 = (k / W) | 0; return (x0 > 0 && seen[k - 1]) || (x0 < W - 1 && seen[k + 1]) || (y0 > 0 && seen[k - W]) || (y0 < H - 1 && seen[k + W]); };
   // pass 1: shave the halo — an edge pixel closer to the background than to the shirt beside it is background (twice, for 2-px rims)
   const shirtNear = k => { const x0 = k % W, y0 = (k / W) | 0; let r = 0, g = 0, b = 0, n = 0;
@@ -753,7 +756,85 @@ async function cutoutPhoto(dataUrl) {
   cx.putImageData(d, 0, 0);
   const out = document.createElement('canvas'), pad = 2; out.width = x2 - x1 + 1 + pad * 2; out.height = y2 - y1 + 1 + pad * 2;
   out.getContext('2d').drawImage(cv, x1, y1, x2 - x1 + 1, y2 - y1 + 1, pad, pad, x2 - x1 + 1, y2 - y1 + 1);
-  return { url: out.toDataURL('image/png'), cut: true };
+  return { url: out.toDataURL('image/png'), cut: true, frac, rim: border.filter(k => !seen[k] && toBg(k) < 60).length / border.length };
+}
+// Cut a shirt out of a photo. The background is flooded in from the edges through smooth areas only:
+// first the shirt's outline is found (where brightness changes sharply, after a light blur), thickened a
+// pixel to close gaps, and the flood may never cross it. Lighting gradients, vignettes and soft shadows
+// are smooth, so they go; a shirt edge (even white on white) has a line, so the flood stops there.
+async function cutoutOutline(dataUrl, opt) {
+  opt = Object.assign({ E: 16, TP: 110, dil: 1 }, opt || {});
+  const im = await loadImg(dataUrl), sc = Math.min(1, 900 / Math.max(im.width, im.height));
+  const W = Math.max(3, Math.round(im.width * sc)), H = Math.max(3, Math.round(im.height * sc));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(im, 0, 0, W, H);
+  const d = cx.getImageData(0, 0, W, H), px = d.data, N = W * H;
+  // brightness, blurred twice (3x3 box) so JPEG noise and fabric texture don't read as edges
+  let g = new Float32Array(N); for (let k = 0; k < N; k++) g[k] = .299 * px[k * 4] + .587 * px[k * 4 + 1] + .114 * px[k * 4 + 2];
+  const blur = a => { const o = new Float32Array(N); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let s = 0, n = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H) { s += a[yy * W + xx]; n++; } } o[y * W + x] = s / n; } return o; };
+  g = blur(blur(g));
+  // edge strength (Sobel), plus color edges so a teal shirt on a same-brightness gray wall still has an outline
+  const E = new Uint8Array(N);
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const k = y * W + x;
+    const gx = g[k - W + 1] + 2 * g[k + 1] + g[k + W + 1] - g[k - W - 1] - 2 * g[k - 1] - g[k + W - 1];
+    const gy = g[k + W - 1] + 2 * g[k + W] + g[k + W + 1] - g[k - W - 1] - 2 * g[k - W] - g[k - W + 1];
+    const cd = Math.abs(px[(k + 1) * 4] - px[(k - 1) * 4]) + Math.abs(px[(k + 1) * 4 + 1] - px[(k - 1) * 4 + 1]) + Math.abs(px[(k + 1) * 4 + 2] - px[(k - 1) * 4 + 2])
+             + Math.abs(px[(k + W) * 4] - px[(k - W) * 4]) + Math.abs(px[(k + W) * 4 + 1] - px[(k - W) * 4 + 1]) + Math.abs(px[(k + W) * 4 + 2] - px[(k - W) * 4 + 2]);
+    if (Math.hypot(gx, gy) / 4 > opt.E || cd > opt.E * 6) E[k] = 1;
+  }
+  // thicken the outline so the flood can't slip through a one-pixel gap
+  let B = E; for (let r = 0; r < opt.dil; r++) { const o = new Uint8Array(B); for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) { const k = y * W + x; if (B[k]) { o[k - 1] = o[k + 1] = o[k - W] = o[k + W] = 1; } } B = o; }
+  const border = []; for (let i = 0; i < W; i++) border.push(i, (H - 1) * W + i); for (let j = 1; j < H - 1; j++) border.push(j * W, j * W + W - 1);
+  const med = ch => { const v = border.map(k => px[k * 4 + ch]).sort((a, b) => a - b); return v[v.length >> 1]; };
+  const bg = [med(0), med(1), med(2)];
+  const toBg = k => Math.hypot(px[k * 4] - bg[0], px[k * 4 + 1] - bg[1], px[k * 4 + 2] - bg[2]);
+  const seen = new Uint8Array(N), q = [];
+  for (const k of border) if (!seen[k] && !B[k]) { seen[k] = 1; q.push(k); }
+  while (q.length) {
+    const k = q.pop(), x0 = k % W;
+    for (const n of [x0 > 0 ? k - 1 : -1, x0 < W - 1 ? k + 1 : -1, k - W, k + W])
+      if (n >= 0 && n < N && !seen[n] && !B[n] && toBg(n) < opt.TP) { seen[n] = 1; q.push(n); }
+  }
+  // the outline pixels that border the flood and still look like background belong to it too
+  for (let pass = 0; pass < opt.dil + 1; pass++) {
+    const add = []; for (let k = 0; k < N; k++) { if (seen[k] || !B[k]) continue; const x0 = k % W;
+      if (((x0 > 0 && seen[k - 1]) || (x0 < W - 1 && seen[k + 1]) || (k >= W && seen[k - W]) || (k + W < N && seen[k + W])) && !E[k]) add.push(k); }
+    for (const k of add) seen[k] = 1;
+  }
+  // keep the big pieces (the shirt), drop crumbs
+  const lab = new Int32Array(N), sizes = [0]; let nl = 0;
+  for (let k0 = 0; k0 < N; k0++) { if (seen[k0] || lab[k0]) continue; nl++; let sz = 0; const st = [k0]; lab[k0] = nl;
+    while (st.length) { const k = st.pop(); sz++; const x0 = k % W; for (const n of [x0 > 0 ? k - 1 : -1, x0 < W - 1 ? k + 1 : -1, k - W, k + W]) if (n >= 0 && n < N && !seen[n] && !lab[n]) { lab[n] = nl; st.push(n); } }
+    sizes.push(sz); }
+  const biggest = Math.max(0, ...sizes.slice(1));
+  for (let k = 0; k < N; k++) if (!seen[k] && sizes[lab[k]] < biggest * .03) seen[k] = 1;
+  // holes: background trapped inside the shirt outline (under an arm) stays shirt, which is right for a shirt
+  let removed = 0; for (let k = 0; k < N; k++) removed += seen[k];
+  const frac = removed / N;
+  if (frac < .04 || frac > .97) return { url: dataUrl, cut: false };
+  let x1 = W, y1 = H, x2 = 0, y2 = 0;
+  for (let k = 0; k < N; k++) {
+    if (seen[k]) { px[k * 4 + 3] = 0; continue; }
+    const x0 = k % W, y0 = (k / W) | 0;
+    const edge = (x0 > 0 && seen[k - 1]) || (x0 < W - 1 && seen[k + 1]) || (y0 > 0 && seen[k - W]) || (y0 < H - 1 && seen[k + W]);
+    if (edge) px[k * 4 + 3] = 170;
+    if (x0 < x1) x1 = x0; if (x0 > x2) x2 = x0; if (y0 < y1) y1 = y0; if (y0 > y2) y2 = y0;
+  }
+  cx.putImageData(d, 0, 0);
+  const out = document.createElement('canvas'), pad = 2; out.width = x2 - x1 + 1 + pad * 2; out.height = y2 - y1 + 1 + pad * 2;
+  out.getContext('2d').drawImage(cv, x1, y1, x2 - x1 + 1, y2 - y1 + 1, pad, pad, x2 - x1 + 1, y2 - y1 + 1);
+  return { url: out.toDataURL('image/png'), cut: true, frac, rim: border.filter(k => !seen[k] && toBg(k) < 60).length / border.length };
+}
+
+// both methods, deduplicated: the coach taps the picture that looks right
+async function cutoutChoices(dataUrl) {
+  // two methods; hide results that kept a band of wall-colored frame (background left behind, not a shirt running off the edge), then put the one
+  // that kept the most shirt first (the other method sometimes eats a white shirt)
+  const out = [];
+  for (const f of [cutoutOutline, cutoutStrict]) { try { const r = await f(dataUrl); if (r.cut && r.rim < .05) out.push(r); } catch (e) {} }
+  out.sort((x, y) => x.frac - y.frac);
+  return out.filter((o, i) => !i || (Math.abs(o.frac - out[0].frac) >= .03 && 1 - o.frac > (1 - out[0].frac) * .75));
 }
 const loadImg = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
 async function composeAerial(m) {
@@ -984,7 +1065,7 @@ function fieldsFor(id) {
     case 'wear': { const W = get('data.wear'); if (!W.home) normalizeWear(S);
       const sel = (path, label, opts) => `<label class="fld" for="${fid(path)}"><span>${label}</span><select id="${fid(path)}" data-path="${path}">${opts.map(([v, n]) => `<option value="${v}"${get(path) === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
       const two = W.kits === 'two';
-      const kit = (k, title) => `${title ? `<p class="eyebrow" style="grid-column:1/-1;margin:6px 0 0">${title}</p>` : ''}${F(`data.wear.${k}.big`, 'What to wear')}${F(`data.wear.${k}.tag`, 'Small note under it')}${F(`data.wear.${k}.color`, 'Shirt color', { type: 'color' })}${FILE(`data.wear.${k}.photo`, two ? `Photo of the ${k} jersey (optional). One shirt on a plain background cuts out best.` : 'Photo of the jersey (optional). One shirt on a plain background cuts out best.')}`;
+      const kit = (k, title) => `${title ? `<p class="eyebrow" style="grid-column:1/-1;margin:6px 0 0">${title}</p>` : ''}${F(`data.wear.${k}.big`, 'What to wear')}${F(`data.wear.${k}.tag`, 'Small note under it')}${F(`data.wear.${k}.color`, 'Shirt color', { type: 'color' })}${FILE(`data.wear.${k}.photo`, two ? `Photo of the ${k} jersey (optional). One shirt on a plain background cuts out best; a white one, on something dark.` : 'Photo of the jersey (optional). One shirt on a plain background cuts out best; a white one, on something dark.')}`;
       return `<div class="fld wide"><span>Does the team wear the same thing every game?</span><div class="seg" role="group" aria-label="Jerseys"><button data-act="kits" data-id="one" aria-pressed="${!two}">One jersey</button><button data-act="kits" data-id="two" aria-pressed="${two}">Home &amp; away</button></div></div>`
       + (two ? kit('home', 'Home games') + kit('away', 'Away games') : kit('home', ''))
       + `<details class="more" style="grid-column:1/-1"><summary>Drawn shirt (used when there is no photo)</summary><div class="flds">`
@@ -1510,6 +1591,7 @@ document.addEventListener('click', ev => {
   else if (act === 'impReadPaste') { const t = $('#impPaste'); return impOpen(impSplit(t ? t.value : '')); }
   else if (act === 'impApply') return impApply(id);
   else if (act === 'impCancel') { UI.imp = null; $('#overlay').innerHTML = ''; return; }
+  else if (act === 'photoPick') { const P = UI.photoPick; if (P && P.urls[+id]) { set(P.path, P.urls[+id]); applyEvent(S.cur); } UI.photoPick = null; $('#overlay').innerHTML = ''; render(); return; }
   else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
   render();
   if (act === 'step') window.scrollTo(0, 0);
@@ -1559,10 +1641,15 @@ document.addEventListener('change', ev => {
   r.onload = async () => {
     const isShirt = /^data\.wear\.(home|away)?\.?photo$/.test(path);
     if (isShirt) {
-      let res = { url: r.result, cut: false }; try { res = await cutoutPhoto(r.result); } catch (e) {}
-      set(path, res.url); applyEvent(S.cur); render();
+      let opts = []; try { opts = await cutoutChoices(r.result); } catch (e) {}
+      const first = opts[0] ? opts[0].url : r.result;
+      set(path, first); applyEvent(S.cur); render();
       if (path === 'data.wear.home.photo') paletteFrom(r.result);
-      if (!res.cut) overlay('<p class="eyebrow">Photo added as it is</p><p style="margin:0">I could not find a plain background to remove, so the whole photo is used. A picture of just the shirt on a plain wall or floor cuts out cleanly.</p>');
+      UI.photoPick = { path, urls: [...opts.map(o => o.url), r.result] };
+      const tiles = UI.photoPick.urls.map((u, i) => `<button class="picktile${i === 0 ? ' on' : ''}" data-act="photoPick" data-id="${i}" aria-label="${i === UI.photoPick.urls.length - 1 ? 'The original photo' : 'Cut-out ' + (i + 1)}"><img src="${u}" alt=""><span>${i === UI.photoPick.urls.length - 1 ? 'Original' : 'Cut-out'}</span></button>`).join('');
+      $('#overlay').innerHTML = `<div class="ov"><div class="box"><p class="eyebrow">Tap the one that looks right</p>
+        <p style="margin:0 0 10px">${opts.length ? 'Here’s the shirt with the background taken out, and your photo as it is. Tap the one that looks best.' : 'I couldn’t separate the shirt from the background in this one.'} A white jersey cuts out best laid on something dark.</p>
+        <div class="pickrow">${tiles}</div></div></div>`;
       return;
     }
     set(path, r.result); render();
