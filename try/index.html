@@ -436,6 +436,7 @@ function normalizeTeam(t) {
   if (t.data.bring) t.data.bring.items = arr(t.data.bring.items);
   if (t.data.coach) t.data.coach.list = arr(t.data.coach.list);
   t.season = arr(t.season); t.season.forEach(w => { if (w && w.times != null) w.times = arr(w.times); });
+  if (t.data.wear && !t.data.wear.home) normalizeWear(t);
   const m = t.data.map; if (!m) return t;
   if (typeof m.pin === 'string' || m.pin == null) m.pin = { label: (typeof m.pin === 'string' ? m.pin : '') || m.pin_label || '' };
   if (m.pin.mx == null && m.center && m.span) { const u = m.pin.u != null ? m.pin.u : (m.pin.x != null ? m.pin.x : .5), v = m.pin.v != null ? m.pin.v : (m.pin.y != null ? m.pin.y * CROP + (1 - CROP) / 2 : .5); [m.pin.mx, m.pin.my] = sqToWorld(m, u, v); }
@@ -469,6 +470,25 @@ let S = APP.teams[0];
 const UI = { tab: 'build', editing: null, step: 0, noteOpen: false };
 
 // the weekly touch: one season row becomes the email; everything else is season setup that carries over
+// Wear: one jersey, or home & away. The card shown each week is picked from the coach's own settings, and
+// the card style follows the shirt: a light shirt sits on the team color, a dark shirt on the light card.
+function kitLum(h) { const n = parseInt(String(h || '#000000').slice(1), 16); return .299 * (n >> 16) + .587 * ((n >> 8) & 255) + .114 * (n & 255); }
+function showKit(home) {
+  const W = S.data.wear; if (!W) return;
+  if (!W.home) normalizeWear(S);
+  const k = (W.kits === 'two' && !home) ? W.away : W.home;
+  W.big = k.big || ''; W.tag = k.tag || '';
+  const color = k.color || S.colors.primary;
+  if (W.generic) W.generic.color = color;
+  W.style = kitLum(color) > 150 ? 'light' : 'dark';
+}
+function normalizeWear(t) {
+  const W = t.data.wear; if (!W || W.home) return;
+  const g = W.generic || {}, two = t.sport === 'flag' || t.sport === 'basketball';
+  W.kits = two ? 'two' : 'one';
+  W.home = { big: t.sport === 'flag' || t.sport === 'basketball' ? 'Home Jerseys' : (W.big || ''), tag: t.sport === 'flag' ? 'Dark' : t.sport === 'basketball' ? 'White · navy shorts' : (W.tag || ''), color: t.sport === 'basketball' ? '#f4f4f4' : (g.color || t.colors.primary) };
+  W.away = { big: 'Away Jerseys', tag: t.sport === 'flag' ? 'White' : t.sport === 'basketball' ? 'Navy · white shorts' : 'White', color: t.sport === 'basketball' ? t.colors.primary : '#f4f4f4' };
+}
 function applyEvent(i) {
   const r = S.season[i]; if (!r) return; S.cur = i;
   const e = S.data.event, flag = S.sport === 'flag', weekly = S.sport !== 'wrestling';
@@ -478,8 +498,7 @@ function applyEvent(i) {
   if (r.venue) e.venue = r.venue;
   if (r.address) S.data.map.address = r.address;
   S.data.map.big = r.where; if (S.data.map.pin && typeof S.data.map.pin === 'object' && /^Field/.test(r.where)) S.data.map.pin.label = r.where;
-  if (flag) { S.data.wear.big = r.home ? 'Home Jerseys' : 'Away Jerseys'; S.data.wear.tag = r.home ? 'Dark' : 'White'; S.data.wear.style = r.home ? 'dark' : 'light'; if (S.data.wear.generic) S.data.wear.generic.color = r.home ? S.colors.primary : '#f4f4f4'; }
-  if (S.sport === 'basketball') { S.data.wear.big = r.home ? 'Home Jerseys' : 'Away Jerseys'; S.data.wear.tag = r.home ? 'White · navy shorts' : 'Navy · white shorts'; S.data.wear.style = r.home ? 'dark' : 'light'; S.data.wear.generic.color = r.home ? '#f4f4f4' : S.colors.primary; }
+  showKit(r.home !== false);
   S.on.note = !!(r.note && r.note.trim()); if (r.note) S.data.note = { title: 'Heads up', text: r.note };
 }
 APP.teams.forEach(t => { S = t; applyEvent(t.cur); }); S = APP.teams[0];
@@ -797,11 +816,15 @@ function fieldsFor(id) {
   switch (id) {
     case 'event': return F('data.event.org', 'League or school') + F('data.event.what', 'Banner line') + F('data.event.team', 'Team') + F('data.event.accent', 'Week or event type') + F('data.event.sub', 'Small line under the title') + F('data.event.date', 'Date') + F('data.event.venue', 'Venue name') + F('data.event.oppLabel', 'VS. / AT') + F('data.event.opp', 'Opponent (blank for a tournament)') + F('data.event.ghost', 'Big ghost character');
     case 'times': return LIST('data.times.rows', [{ k: 'label', label: 'What' }, { k: 'time', label: 'Time' }, { k: 'hot', label: 'main', check: true }], 'Add a time');
-    case 'wear': { const g = get('data.wear.generic') || {}; const sel = (path, label, opts) => `<label class="fld" for="${fid(path)}"><span>${label}</span><select id="${fid(path)}" data-path="${path}">${opts.map(([v, n]) => `<option value="${v}"${get(path) === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
-      return F('data.wear.big', 'What to wear') + F('data.wear.tag', 'Tag under it') + sel('data.wear.style', 'Card style', [['dark', 'Light card (dark uniform)'], ['light', 'Team-color card (light uniform)']])
-      + `<p class="hint"><b>Shirt picture.</b> No photo handy, or the only photo has a kid in it? Pick a generic shirt. The photo option needs a flat shot of just the shirt; the app cuts out the background.</p>`
-      + sel('data.wear.generic.shape', 'Generic shirt', [['tshirt', 'T-shirt'], ['', 'None']]) + F('data.wear.generic.color', 'Shirt color', { type: 'color' }) + sel('data.wear.generic.glyph', 'Mark on it', [['none', 'None'], ['soccer', 'Soccer ball'], ['football', 'Football'], ['basketball', 'Basketball']])
-      + FILE('data.wear.photo', 'Or a photo of the shirt (replaces the generic one)'); }
+    case 'wear': { const W = get('data.wear'); if (!W.home) normalizeWear(S);
+      const sel = (path, label, opts) => `<label class="fld" for="${fid(path)}"><span>${label}</span><select id="${fid(path)}" data-path="${path}">${opts.map(([v, n]) => `<option value="${v}"${get(path) === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
+      const two = W.kits === 'two';
+      const kit = (k, title) => `${title ? `<p class="eyebrow" style="grid-column:1/-1;margin:6px 0 0">${title}</p>` : ''}${F(`data.wear.${k}.big`, 'What to wear')}${F(`data.wear.${k}.tag`, 'Small note under it')}${F(`data.wear.${k}.color`, 'Shirt color', { type: 'color' })}`;
+      return `<div class="fld wide"><span>Does the team wear the same thing every game?</span><div class="seg" role="group" aria-label="Jerseys"><button data-act="kits" data-id="one" aria-pressed="${!two}">One jersey</button><button data-act="kits" data-id="two" aria-pressed="${two}">Home &amp; away</button></div></div>`
+      + (two ? kit('home', 'Home games') + kit('away', 'Away games') : kit('home', ''))
+      + `<details class="more" style="grid-column:1/-1"><summary>Shirt picture</summary><div class="flds"><p class="hint">No photo handy, or the only photo has a kid in it? Use the drawn shirt. A photo needs a flat shot of just the shirt.</p>`
+      + sel('data.wear.generic.shape', 'Drawn shirt', [['tshirt', 'T-shirt'], ['', 'None']]) + sel('data.wear.generic.glyph', 'Mark on it', [['none', 'None'], ['soccer', 'Soccer ball'], ['football', 'Football'], ['basketball', 'Basketball']])
+      + FILE('data.wear.photo', 'Or a photo of the shirt') + `</div></details>`; }
     case 'map': { const m = get('data.map'); if (typeof m.pin === 'string') { m.pin_label = m.pin; m.pin = null; }
       return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.address', 'Address', { area: true, wide: true })
       + `<div class="fld wide"><button class="btn alt" data-act="findMap" data-id="${m.img ? 1 : 0}" style="align-self:flex-start">${m.img ? 'Find again from the address' : 'Find on map'}</button>${m.img ? '' : ''}<span id="mapStatus" class="hint" style="margin-top:4px"></span></div>`
@@ -1022,6 +1045,7 @@ document.addEventListener('click', ev => {
   else if (act === 'reset') { if (!confirm('Replace everything with the example teams?')) return; APP.teams = EXAMPLES(); APP.teams.forEach(t => { S = t; applyEvent(t.cur); }); APP.ti = 0; return go('home'); }
   else if (act === 'delTeam') { const k = id != null ? +id : APP.ti, t = APP.teams[k]; if (!confirm(`Delete ${t.data.event.team} · ${t.seasonLabel}? This can't be undone.`)) return; APP.teams.splice(k, 1); if (!APP.teams.length) APP.teams = EXAMPLES().slice(0, 1); APP.ti = 0; return go('home'); }
   else if (act === 'homeaway') { S.season[S.cur].home = id === '1'; applyEvent(S.cur); }
+  else if (act === 'kits') { S.data.wear.kits = id; applyEvent(S.cur); }
   else if (act === 'noteOpen') UI.noteOpen = true;
   else if (act === 'tab') UI.tab = id;
   else if (act === 'edit') UI.editing = id;
@@ -1072,6 +1096,7 @@ document.addEventListener('click', ev => {
 document.addEventListener('input', ev => {
   const t = ev.target; if (!t.dataset.path) return;
   set(t.dataset.path, t.type === 'checkbox' ? t.checked : t.value);
+  if (t.dataset.path.startsWith('data.wear.home') || t.dataset.path.startsWith('data.wear.away')) applyEvent(S.cur);
   if (t.dataset.path.startsWith('season.')) { applyEvent(S.cur); const list = $('.wk-list'); if (list) list.outerHTML = wkList(); }
   renderPreviews(); saveApp(); showBlock(blockOf(t.dataset.path), true);
 });
