@@ -146,6 +146,9 @@
   .pickrow { display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:8px; }
   .picktile { background:#062226; border:3px solid transparent; border-radius:12px; padding:8px 6px 6px; display:flex; flex-direction:column; align-items:center; gap:6px; min-height:150px; color:#fff; font:700 13px/1 'Barlow Condensed', sans-serif; letter-spacing:.1em; text-transform:uppercase; }
   .picktile.on { border-color:#ffd23f; }
+  .gpt { margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .gpt .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .gpt .btn { flex:1 1 140px; text-align:center; text-decoration:none; font-size:15px; }
   .picktile img { max-width:100%; max-height:190px; border:0; margin:0; flex:1; object-fit:contain; }
   .impwarn { margin:0 0 10px; padding:8px 10px; border-radius:10px; border:2px solid #ffd23f; background:rgba(255,210,63,.1); font-size:13.5px; }
   .impus.ask { border:2px solid #ffd23f; border-radius:10px; padding:8px 10px; background:rgba(255,210,63,.1); }
@@ -835,6 +838,37 @@ async function cutoutChoices(dataUrl) {
   for (const f of [cutoutOutline, cutoutStrict]) { try { const r = await f(dataUrl); if (r.cut && r.rim < .05) out.push(r); } catch (e) {} }
   out.sort((x, y) => x.frac - y.frac);
   return out.filter((o, i) => !i || (Math.abs(o.frac - out[0].frac) >= .03 && 1 - o.frac > (1 - out[0].frac) * .75));
+}
+// the coach's own ChatGPT does the cut-out when ours can't; we only copy the photo and fill in the ask
+const GPT_PROMPT = 'I am pasting a photo of a sports jersey. Cut out just the jersey (or jerseys) and give it back as a PNG with a transparent background. Keep the colors, numbers and logos exactly as they are, do not redraw anything.';
+function gptCopy() {
+  const P = UI.photoPick, b = $('#gptCopy'); if (!P || !b) return;
+  const png = loadImg(P.orig).then(im => new Promise(res => { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; c.getContext('2d').drawImage(im, 0, 0); c.toBlob(res, 'image/png'); }));
+  let done = false; const said = t => { if (!done) { done = true; b.textContent = t; } };
+  b.textContent = 'Copying…'; setTimeout(() => said('Attach it in ChatGPT'), 5000);
+  try { navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]).then(() => said('Photo copied ✓'), () => said('Attach it in ChatGPT')); }
+  catch (e) { said('Attach it in ChatGPT'); }
+}
+// true when a real share of the picture is see-through (already cut out)
+// true when the photo's frame is textured (grass, trees, a room), not a wall or sheet: lighting on a wall is
+// smooth from pixel to pixel, grass isn't. Measured as the share of neighbor steps around the frame that jump.
+async function borderBusy(dataUrl) {
+  try { const im = await loadImg(dataUrl), sc = Math.min(1, 300 / Math.max(im.width, im.height));
+    const W = Math.max(3, Math.round(im.width * sc)), H = Math.max(3, Math.round(im.height * sc));
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.drawImage(im, 0, 0, W, H);
+    const px = x.getImageData(0, 0, W, H).data, ring = [];
+    for (let i = 0; i < W; i++) ring.push(i); for (let j = 1; j < H; j++) ring.push(j * W + W - 1);
+    for (let i = W - 2; i >= 0; i--) ring.push((H - 1) * W + i); for (let j = H - 2; j > 0; j--) ring.push(j * W);
+    let n = 0; for (let i = 0; i < ring.length; i++) { const a = ring[i] * 4, b = ring[(i + 1) % ring.length] * 4;
+      if (Math.abs(px[a] - px[b]) + Math.abs(px[a + 1] - px[b + 1]) + Math.abs(px[a + 2] - px[b + 2]) > 24) n++; }
+    return n / ring.length > .1; } catch (e) { return false; }
+}
+async function seeThrough(dataUrl) {
+  if (!/^data:image\/(png|webp)/.test(dataUrl)) return false;
+  try { const im = await loadImg(dataUrl), sc = Math.min(1, 200 / Math.max(im.width, im.height));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(im.width * sc)); c.height = Math.max(1, Math.round(im.height * sc));
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0, c.width, c.height); const a = x.getImageData(0, 0, c.width, c.height).data;
+    let n = 0; for (let k = 3; k < a.length; k += 4) if (a[k] < 128) n++; return n / (a.length / 4) > .03; } catch (e) { return false; }
 }
 const loadImg = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
 async function composeAerial(m) {
@@ -1592,6 +1626,7 @@ document.addEventListener('click', ev => {
   else if (act === 'impApply') return impApply(id);
   else if (act === 'impCancel') { UI.imp = null; $('#overlay').innerHTML = ''; return; }
   else if (act === 'photoPick') { const P = UI.photoPick; if (P && P.urls[+id]) { set(P.path, P.urls[+id]); applyEvent(S.cur); } UI.photoPick = null; $('#overlay').innerHTML = ''; render(); return; }
+  else if (act === 'photoGPT') { gptCopy(); return; }
   else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
   render();
   if (act === 'step') window.scrollTo(0, 0);
@@ -1641,15 +1676,19 @@ document.addEventListener('change', ev => {
   r.onload = async () => {
     const isShirt = /^data\.wear\.(home|away)?\.?photo$/.test(path);
     if (isShirt) {
+      if (await seeThrough(r.result)) { set(path, r.result); applyEvent(S.cur); render(); if (path === 'data.wear.home.photo') paletteFrom(r.result); return; }
       let opts = []; try { opts = await cutoutChoices(r.result); } catch (e) {}
-      const first = opts[0] ? opts[0].url : r.result;
+      const busy = await borderBusy(r.result), first = opts[0] && !busy ? opts[0].url : r.result;
       set(path, first); applyEvent(S.cur); render();
       if (path === 'data.wear.home.photo') paletteFrom(r.result);
-      UI.photoPick = { path, urls: [...opts.map(o => o.url), r.result] };
-      const tiles = UI.photoPick.urls.map((u, i) => `<button class="picktile${i === 0 ? ' on' : ''}" data-act="photoPick" data-id="${i}" aria-label="${i === UI.photoPick.urls.length - 1 ? 'The original photo' : 'Cut-out ' + (i + 1)}"><img src="${u}" alt=""><span>${i === UI.photoPick.urls.length - 1 ? 'Original' : 'Cut-out'}</span></button>`).join('');
+      UI.photoPick = { path, urls: [...opts.map(o => o.url), r.result], orig: r.result };
+      const tiles = UI.photoPick.urls.map((u, i) => `<button class="picktile${UI.photoPick.urls[i] === first ? ' on' : ''}" data-act="photoPick" data-id="${i}" aria-label="${i === UI.photoPick.urls.length - 1 ? 'The original photo' : 'Cut-out ' + (i + 1)}"><img src="${u}" alt=""><span>${i === UI.photoPick.urls.length - 1 ? 'Original' : 'Cut-out'}</span></button>`).join('');
       $('#overlay').innerHTML = `<div class="ov"><div class="box"><p class="eyebrow">Tap the one that looks right</p>
         <p style="margin:0 0 10px">${opts.length ? 'Here’s the shirt with the background taken out, and your photo as it is. Tap the one that looks best.' : 'I couldn’t separate the shirt from the background in this one.'} A white jersey cuts out best laid on something dark.</p>
-        <div class="pickrow">${tiles}</div></div></div>`;
+        <div class="pickrow">${tiles}</div>
+        <div class="gpt"><p class="eyebrow">${opts.length ? 'Not clean enough? Ask ChatGPT' : 'Ask ChatGPT to cut it out'}</p>
+          <p style="margin:0 0 8px">A free ChatGPT account can cut it out. Copy the photo, open ChatGPT, paste it and send. Save the picture it makes, then add that one here instead.</p>
+          <div class="btns"><button class="btn alt" data-act="photoGPT" id="gptCopy">Copy photo</button><a class="btn alt" href="https://chatgpt.com/?q=${encodeURIComponent(GPT_PROMPT)}" target="_blank" rel="noopener">Open ChatGPT</a></div></div></div></div>`;
       return;
     }
     set(path, r.result); render();
