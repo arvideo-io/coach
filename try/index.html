@@ -12,7 +12,7 @@
   :root[data-theme="dark"] { --ground:#0e1516; --panel:#172123; --ink:#e7eeee; --mute:#93a4a5; --line:#2a383a; --accent:#3fb6c1; --accent-ink:#06282b; --go:#34c759; --soft:#1e2a2c; }
 
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--ground); color:var(--ink); font:400 15px/1.45 Inter, system-ui, sans-serif; padding-inline:16px; padding-block:18px 110px; }
+  body { margin:0; background:var(--ground); color:var(--ink); font:400 15px/1.45 Inter, system-ui, sans-serif; padding-inline:16px; padding-block:18px 24px; }
   button, input, select, textarea { font:inherit; color:inherit; }
   button { cursor:pointer; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
@@ -247,6 +247,13 @@
   .apin .lab { margin-top:6px; font:800 14px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#fff; background:rgba(0,0,0,.65); padding:5px 8px; border-radius:6px; white-space:nowrap; transform:translateX(calc(50% - 50%)); }
   .abox { position:absolute; border:2px solid rgba(255,255,255,.92); background:rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center; pointer-events:none; }
   .aer.editing[data-mode="box"] .abox:not(.ghost) { pointer-events:auto; cursor:move; }
+  .aer.editing[data-mode="tap"], .aer.editing[data-mode="tap"] * { touch-action:pan-y; }
+  .aer.editing[data-mode="tap"] .abox, .aer.editing[data-mode="tap"] .apark { pointer-events:auto; cursor:pointer; }
+  .aer.editing[data-mode="tap"] { cursor:crosshair; }
+  .tapnote { margin:0 0 6px; font:700 15px/1.3 Inter, sans-serif; }
+  .mapbar { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .mapbar .btn { flex:1 1 auto; padding:12px 14px; }
+  .mapbar .zoom { flex:0 0 56px; font-size:24px; padding:8px 0; }
   .abox.ours { border:3px solid #ff1f1f; background:repeating-linear-gradient(45deg, rgba(255,31,31,.85) 0 2px, rgba(255,31,31,.32) 2px 8px); }
   .abox span { white-space:nowrap; font:400 20px/1 Anton, Impact, sans-serif; color:#fff; text-transform:none; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; padding:2px 4px; text-align:center; }
   .apark { position:absolute; transform:translate(-50%, -50%); display:flex; align-items:center; gap:6px; pointer-events:none; }
@@ -568,7 +575,7 @@ function boxDisp(m, bx) {
 }
 // the highlighted box is whichever label matches the event's "where" (Field 3), so the schedule drives it
 const isOurs = (m, bx) => !!bx.label && !!m.big && bx.label.trim().toLowerCase() === m.big.trim().toLowerCase();
-function aerialHTML(m, editing) {
+function aerialHTML(m, editing, mode) {
   const boxes = (m.center && Array.isArray(m.boxes)) ? m.boxes : [], H = mapH(m);
   const bxs = boxes.map((bx, i) => {
     const r = boxDisp(m, bx);
@@ -578,7 +585,7 @@ function aerialHTML(m, editing) {
   }).join('');
   let pin = '';
   if (!boxes.length && m.center && m.pin && typeof m.pin === 'object' && m.pin.mx != null) { const [px, py] = worldToDisp(m, m.pin.mx, m.pin.my); pin = `<div class="apin" style="left:${px * 100}%;top:${py * 100}%"><div class="dot"></div><div class="lab">${esc(m.pin.label || '')}</div></div>`; }
-  return `<div class="aer${editing ? ' editing' : ''}" data-mode="${editing ? (UI.mapMode || 'box') : ''}" style="aspect-ratio:${MAPW}/${H}"><img src="${picURL(m.img)}" alt="" draggable="false">${bxs}${pin}<div class="attr">Imagery: USGS NAIP</div></div>`;
+  return `<div class="aer${editing ? ' editing' : ''}" data-mode="${editing ? (mode || UI.mapMode || 'box') : ''}" style="aspect-ratio:${MAPW}/${H}${mode === 'tap' ? `;width:min(100%, calc(46vh * ${(MAPW / H).toFixed(4)}));margin:0 auto` : ''}"><img src="${picURL(m.img)}" alt="" draggable="false">${bxs}${pin}<div class="attr">Imagery: USGS NAIP</div></div>`;
 }
 // true-size fields, in yards (width x length); placed at the view center and dragged into place
 const FIELD_SIZES = [['flag', 'NFL FLAG 30×70 yd', 30, 70], ['u6', 'Soccer U6 20×30 yd', 20, 30], ['u8', 'Soccer U8 30×50 yd', 30, 50], ['u10', 'Soccer U10 45×70 yd', 45, 70], ['u12', 'Soccer U12 55×85 yd', 55, 85], ['full', 'Soccer full 75×115 yd', 75, 115], ['lax', 'Lacrosse 60×110 yd', 60, 110]];
@@ -644,6 +651,46 @@ function ensureAerial() {
   aerialInFlight.add(m); m.span = m.span || 240;
   fetchSquare(m.center.lat, m.center.lon, m.span).then(raw => { RAW.set(m, raw); return composeAerial(m); }).then(() => render()).catch(e => console.warn('aerial', e)).finally(() => aerialInFlight.delete(m));
 }
+// ---- phone map: tap where you'll be ----
+let tapStart = null;
+document.addEventListener('pointerdown', ev => { const host = ev.target.closest('.aer[data-mode="tap"]'); tapStart = host ? { x: ev.clientX, y: ev.clientY, host, target: ev.target } : null; });
+document.addEventListener('pointercancel', () => { tapStart = null; });              // the page scrolled
+document.addEventListener('pointerup', ev => {
+  if (!tapStart) return; const t = tapStart; tapStart = null;
+  if (Math.hypot(ev.clientX - t.x, ev.clientY - t.y) > 10) return;
+  mapTap(t.host, ev.clientX, ev.clientY, t.target);
+});
+function mapTap(host, cx, cy, target) {
+  const m = S.data.map; if (!m.center) return;
+  const r = host.getBoundingClientRect(), [wx, wy] = dispToWorld(m, (cx - r.left) / r.width, (cy - r.top) / r.height);
+  const moveTo = bx => { const w = bx.x1 - bx.x0, h = bx.y1 - bx.y0; bx.x0 = wx - w / 2; bx.x1 = wx + w / 2; bx.y0 = wy - h / 2; bx.y1 = wy + h / 2; };
+  const hit = target && target.closest && target.closest('.abox, .apark');
+  if (hit && hit.dataset.box != null && UI.selBox !== +hit.dataset.box) { UI.selBox = +hit.dataset.box; render(); return; }   // tap a box: select it
+  if (UI.selBox != null && m.boxes && m.boxes[UI.selBox]) { moveTo(m.boxes[UI.selBox]); render(); return; }                  // selected: move it here
+  const ours = (m.boxes || []).find(b => isOurs(m, b));
+  if (ours) moveTo(ours);                                                                                                      // this week's field
+  else m.pin = Object.assign(m.pin && typeof m.pin === 'object' ? m.pin : { label: m.big || '' }, { mx: wx, my: wy });         // or the pin
+  render();
+}
+// the address alone finds the map: a small edit (a typo) keeps the placed fields, a different place starts fresh
+let autoMapT = null;
+function autoMapSoon(ms) { clearTimeout(autoMapT); autoMapT = setTimeout(autoMap, ms == null ? 800 : ms); }
+async function autoMap() {
+  const m = S.data.map, st = $('#mapStatus'); if (!m || !(m.address || '').trim() || m.own) return;
+  if (/claude\.ai$/.test(location.hostname) || location.hostname.endsWith('.claudeusercontent.com')) { if (st) st.textContent = 'The map does not load inside this preview. Open arvideo.io/coach/try/.'; return; }
+  const key = m.address.trim(); if (m.geoFor === key && m.img) return;
+  if (st) st.textContent = 'Finding the address…';
+  try {
+    const g = await geocode(key.replace(/\n/g, ', '));
+    const near = m.center && Math.hypot((g.lat - m.center.lat) * 111320, (g.lon - m.center.lon) * 111320 * Math.cos(g.lat * Math.PI / 180)) < 150;
+    if (!near) { m.center = { lat: g.lat, lon: g.lon }; m.span = 240; m.rot = 0; m.boxes = []; const [pmx, pmy] = merc(g.lat, g.lon); m.pin = { mx: pmx, my: pmy, label: (m.pin && m.pin.label) || m.big || '' }; RAW.delete(m); m.img = ''; }
+    m.geoFor = key;
+    if (!m.img || !RAW.get(m)) { if (st) st.textContent = 'Loading the aerial photo…'; RAW.set(m, await fetchSquare(m.center.lat, m.center.lon, m.span)); await composeAerial(m); }
+    render();
+  } catch (e) { mapFail($('#mapStatus'), e); }
+}
+// the true-size field for this sport, or a plain box for indoor sports
+const SPORT_FIELD = { flag: 'flag', soccer: 'u8', lacrosse: 'lax' };
 async function findOnMap(recenter) {
   const m = S.data.map, st = $('#mapStatus');
   // the claude.ai artifact preview blocks outside requests entirely; the real page at arvideo.io does not
@@ -682,7 +729,7 @@ async function nudgeMap(op) {
 }
 // in the editor: pin mode moves the pin; box mode drags a box to draw one, or drags inside an existing box to move it
 document.addEventListener('pointerdown', ev => {
-  const host = ev.target.closest('.aer.editing'); if (!host) return;
+  const host = ev.target.closest('.aer.editing'); if (!host || host.dataset.mode === 'tap') return;
   const m = S.data.map; if (!m.center) return;
   const r = host.getBoundingClientRect();
   const frac = e => [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
@@ -825,7 +872,8 @@ function fieldsFor(id) {
       + `<details class="more" style="grid-column:1/-1"><summary>Shirt picture</summary><div class="flds"><p class="hint">No photo handy, or the only photo has a kid in it? Use the drawn shirt. A photo needs a flat shot of just the shirt.</p>`
       + sel('data.wear.generic.shape', 'Drawn shirt', [['tshirt', 'T-shirt'], ['', 'None']]) + sel('data.wear.generic.glyph', 'Mark on it', [['none', 'None'], ['soccer', 'Soccer ball'], ['football', 'Football'], ['basketball', 'Basketball']])
       + FILE('data.wear.photo', 'Or a photo of the shirt') + `</div></details>`; }
-    case 'map': { const m = get('data.map'); if (typeof m.pin === 'string') { m.pin_label = m.pin; m.pin = null; }
+    case 'map': if (!matchMedia('(min-width: 900px)').matches) return mapFieldsPhone();
+    { const m = get('data.map'); if (typeof m.pin === 'string') { m.pin_label = m.pin; m.pin = null; }
       return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.address', 'Address', { area: true, wide: true })
       + `<div class="fld wide"><button class="btn alt" data-act="findMap" data-id="${m.img ? 1 : 0}" style="align-self:flex-start">${m.img ? 'Find again from the address' : 'Find on map'}</button>${m.img ? '' : ''}<span id="mapStatus" class="hint" style="margin-top:4px"></span></div>`
       + (m.img && !m.own ? `<div class="fld wide"><span>${(UI.mapMode || 'box') === 'pin' ? 'Drag the pin onto the field, gym door or parking.' : UI.selBox != null ? `Moving ${esc((m.boxes[UI.selBox] || {}).label || 'box')}: the arrows move it 2 m a tap. Tap empty map when done.` : 'Add a field at true size below, or drag on the map to draw a box. Tap a box to move it with the arrows. With nothing selected the arrows move the picture.'}</span>${aerialHTML(m, true)}
@@ -841,6 +889,28 @@ function fieldsFor(id) {
     case 'coach': return LIST('data.coach.list', [{ k: 'name', label: 'Name' }, { k: 'phone', label: 'Phone' }, { k: 'email', label: 'Email' }], 'Add a coach');
   }
   return '';
+}
+function mapFieldsPhone() {
+  const m = get('data.map'), sel = UI.selBox != null && m.boxes && m.boxes[UI.selBox] ? UI.selBox : null, fieldKey = SPORT_FIELD[S.sport];
+  const sizeSel = `<select id="fieldSize" aria-label="Field size"><option value="">Add a field at a set size…</option>${FIELD_SIZES.map(f => `<option value="${f[0]}">${f[1]}</option>`).join('')}</select>`;
+  return F('data.map.address', 'Address', { area: true, wide: true })
+    + `<p id="mapStatus" class="hint" style="grid-column:1/-1;margin:0"></p>`
+    + (m.own ? `<p class="hint" style="grid-column:1/-1">Your own map picture is in use. Remove it under More map options to use the aerial.</p>`
+      : m.img ? `<div class="fld wide"><p class="tapnote">${sel != null ? `Tap the map to move <b>${esc(m.boxes[sel].label || 'this box')}</b> there.` : `Tap where you'll be.`}</p>${aerialHTML(m, true, 'tap')}
+        <div class="mapbar">${sel != null
+          ? `<button class="btn alt" data-act="boxTurn" data-id="${sel}">Turn</button><button class="btn alt" data-act="boxDel" data-id="${sel}">Remove</button><button class="btn" data-act="boxDone">Done</button>`
+          : `<button class="btn alt zoom" data-act="nudge" data-id="out" aria-label="Zoom out">&minus;</button><button class="btn alt zoom" data-act="nudge" data-id="in" aria-label="Zoom in">+</button>${fieldKey ? `<button class="btn alt" data-act="addFieldPhone">+ Add a field</button>` : ''}`}</div></div>`
+      : `<p class="hint" style="grid-column:1/-1">Type the address and the map appears here.</p>`)
+    + `<details class="more" style="grid-column:1/-1"${UI.mapMore ? ' open' : ''} data-more="map"><summary>More map options</summary><div class="flds">
+        ${F('data.map.label', 'Small label')}${F('data.map.big', 'Big line (this week’s field)')}
+        ${m.img ? `<div class="fld wide"><span>Picture</span><div class="mapbar"><button class="btn alt" data-act="nudge" data-id="rot">Rotate</button>${[['wide', 'Wide'], ['square', 'Square'], ['tall', 'Tall']].map(([k, n]) => `<button class="btn alt" data-act="nudge" data-id="${k}" aria-pressed="${mapH(m) === { wide: 250, square: 420, tall: 700 }[k]}">${n}</button>`).join('')}</div>
+          <div class="mapbar">${['left', 'up', 'down', 'right'].map(k => `<button class="btn alt" data-act="nudge" data-id="${k}" aria-label="Move the picture ${k}">${{ left: '&larr;', up: '&uarr;', down: '&darr;', right: '&rarr;' }[k]}</button>`).join('')}</div></div>
+          <div class="fld wide"><span>Fields and places</span><div class="row">${sizeSel}<button class="add" data-act="addField">Add</button></div>
+          ${(m.boxes || []).map((bx, i) => `<div class="row"><input type="text" data-path="data.map.boxes.${i}.label" value="${esc(bx.label || '')}" placeholder="Label (Field 1, P for parking)" aria-label="Box label"><button class="icon" data-act="boxDel" data-id="${i}" aria-label="Remove ${esc(bx.label || 'box')}">&times;</button></div>`).join('')}
+          ${(m.boxes || []).length ? '' : F('data.map.pin.label', 'Pin label')}</div>` : ''}
+        <div class="fld wide"><button class="add" data-act="findMap" data-id="1" style="align-self:flex-start">Find again from the address</button></div>
+        ${FILE('data.map.own', 'Or use your own map picture (replaces the aerial)')}
+      </div></details>`;
 }
 const teamFields = () => `<div class="flds">${FILE('data.wear.photo', 'Upload a photo of the jersey and the colors are pulled from it', '-team')}${F('colors.primary', 'Team color', { type: 'color' })}${F('colors.deep', 'Dark background', { type: 'color' })}${F('colors.accent', 'Accent', { type: 'color' })}<p class="hint">${S.colorway ? `Looks like <b>${esc(S.colorway)}</b>. ` : ''}The three swatches are only there if you want to override what the photo gave you.</p></div>`;
 const presetSeg = () => `<div class="seg" role="group" aria-label="Sport preset">${[['flag', 'Flag football'], ['wrestling', 'Wrestling']].map(([k, n]) => `<button data-act="preset" data-id="${k}" aria-pressed="${S.sport === k}">${n}</button>`).join('')}</div>`;
@@ -916,7 +986,7 @@ const STEP_COPY = {
   event: ['Your team', 'The name at the top of every email.'],
   times: ['Times', 'The times parents need, like "Arrive" and "Game". You can change them for each game later.'],
   wear: ['What to wear', 'What the kids should wear.'],
-  map: ['Where to go', 'Type the address, then tap Find on map.'],
+  map: ['Where to go', 'Type the address. The map appears, then tap where you’ll be.'],
   weather: ['Weather', 'Nothing to fill in. The forecast is added when you copy the email.'],
   bring: ['What to bring', 'The things kids always forget.'],
   note: ['A note', 'Anything else parents should know. Leave it blank if there is nothing.'],
@@ -935,16 +1005,17 @@ function stepFields(id) {
   return `<div class="flds">${fieldsFor(id)}</div>`;
 }
 function PageSetupSteps() {
+  if (setupSteps()[Math.min(UI.sstep || 0, setupSteps().length - 1)] === 'map' && !S.data.map.img && (S.data.map.address || '').trim()) autoMapSoon(0);
   const steps = setupSteps(); UI.sstep = Math.min(Math.max(0, UI.sstep || 0), steps.length - 1);
   const id = steps[UI.sstep], [title, lede] = STEP_COPY[id] || [BLOCKS[id] ? BLOCKS[id].name : id, ''];
-  const pv = id === '_done' ? '<div class="mailhost"></div>' : id.startsWith('_') ? '' : `<div class="mini mailhost" data-only="${id === 'times' ? 'event' : id}"></div>`;
+  const pv = id === '_done' ? '<div class="mailhost"></div>' : (id.startsWith('_') || id === 'map') ? '' : `<div class="mini mailhost" data-only="${id === 'times' ? 'event' : id}"></div>`;
   const last = UI.sstep === steps.length - 1;
   return `<div class="season stack steps-page">
     ${hdr('season', 'Season', `Setup · step ${UI.sstep + 1} of ${steps.length}`, esc(title))}
     <div class="dots">${steps.map((_, i) => `<i class="${i <= UI.sstep ? 'on' : ''}"></i>`).join('')}</div>
     ${pv}
     <div class="panel stack"><p class="hint" style="margin:0">${lede}</p>${stepFields(id)}
-      ${id.startsWith('_') || id === 'weather' ? '' : '<p class="hint" style="margin:0">Leave anything blank you don&rsquo;t know yet. Blank parts just don&rsquo;t show.</p>'}</div>
+      ${id.startsWith('_') || id === 'weather' || id === 'map' ? '' : '<p class="hint" style="margin:0">Leave anything blank you don&rsquo;t know yet. Blank parts just don&rsquo;t show.</p>'}</div>
     <div class="stepnav"><button class="btn alt" data-act="sstep" data-id="-1"${UI.sstep === 0 ? ' disabled' : ''}>Back</button>${last ? '<button class="btn" data-act="go" data-id="season">Done</button>' : '<button class="btn" data-act="sstep" data-id="1">Next</button>'}</div>
   </div>`;
 }
@@ -1011,7 +1082,7 @@ function render() {
   $('#app').innerHTML = ({ home: PageHome, new: PageNew, setup: PageSetup, season: PageSeason, event: PageEvent }[APP.page] || PageHome)();
   renderPreviews();
 }
-function go(page) { if (page === 'setup' && APP.page !== 'setup') UI.sstep = 0; APP.page = page; UI.editing = null; UI.noteOpen = false; render(); window.scrollTo(0, 0); ensureAerial(); }
+function go(page) { UI.selBox = null; if (page === 'setup' && APP.page !== 'setup') UI.sstep = 0; APP.page = page; UI.editing = null; UI.noteOpen = false; render(); window.scrollTo(0, 0); ensureAerial(); }
 function newFrom(id) {
   let t;
   if (id.startsWith('t')) { t = JSON.parse(JSON.stringify(APP.teams[+id.slice(1)])); delete t.id; t.season = []; t.seasonLabel = 'New season'; t.cur = 0; delete t.data.wear.photo; }
@@ -1051,7 +1122,7 @@ document.addEventListener('click', ev => {
   else if (act === 'edit') UI.editing = id;
   else if (act === 'closeSheet') UI.editing = null;
   else if (act === 'step') UI.step = Math.max(0, UI.step + +id);
-  else if (act === 'sstep') { UI.sstep = Math.max(0, (UI.sstep || 0) + +id); render(); window.scrollTo(0, 0); return; }
+  else if (act === 'sstep') { UI.selBox = null; UI.sstep = Math.max(0, (UI.sstep || 0) + +id); render(); window.scrollTo(0, 0); return; }
   else if (act === 'add') (Array.isArray(getSafe(path)) ? get(path) : (set(path, []), get(path))).push({ ...(LIST_BLANK[path] || (path.endsWith('.times') ? LIST_BLANK['data.times.rows'] : {})) });
   else if (act === 'del') { const a = getSafe(path); if (Array.isArray(a)) a.splice(+b.dataset.i, 1); }
   else if (act === 'clear') set(path, '');
@@ -1059,6 +1130,8 @@ document.addEventListener('click', ev => {
   else if (act === 'copyText') return copyText();
   else if (act === 'teamLink') return teamLink();
   else if (act === 'findMap') return findOnMap(id === '1');
+  else if (act === 'boxDone') UI.selBox = null;
+  else if (act === 'addFieldPhone') { const k = SPORT_FIELD[S.sport]; if (k) { addField(k); UI.selBox = S.data.map.boxes.length - 1; } }
   else if (act === 'nudge') return nudgeMap(id);
   else if (act === 'mapMode') UI.mapMode = id;
   else if (act === 'boxDel') { S.data.map.boxes.splice(+id, 1); UI.selBox = null; }
@@ -1084,6 +1157,7 @@ function showBlock(id, glow) {
   if (er.top < cr.top + 20 || er.bottom > cr.bottom - 20) col.scrollTo({ top: col.scrollTop + er.top - cr.top - Math.max(20, (cr.height - er.height) / 2), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   if (glow) { el.classList.remove('glow'); void el.offsetWidth; el.classList.add('glow'); }
 }
+document.addEventListener('toggle', ev => { if (ev.target.dataset && ev.target.dataset.more === 'map') UI.mapMore = ev.target.open; }, true);
 document.addEventListener('focusin', ev => { const t = ev.target; showBlock(blockOf(t.dataset && (t.dataset.path || t.dataset.file)), false); });
 document.addEventListener('click', ev => {
   if (!twoPane()) return;
@@ -1097,6 +1171,7 @@ document.addEventListener('input', ev => {
   const t = ev.target; if (!t.dataset.path) return;
   set(t.dataset.path, t.type === 'checkbox' ? t.checked : t.value);
   if (t.dataset.path.startsWith('data.wear.home') || t.dataset.path.startsWith('data.wear.away')) applyEvent(S.cur);
+  if (t.dataset.path === 'data.map.address' && !twoPane()) autoMapSoon();
   if (t.dataset.path.startsWith('season.')) { applyEvent(S.cur); const list = $('.wk-list'); if (list) list.outerHTML = wkList(); }
   renderPreviews(); saveApp(); showBlock(blockOf(t.dataset.path), true);
 });
