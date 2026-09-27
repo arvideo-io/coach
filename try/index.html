@@ -275,11 +275,11 @@
   .abox.ours { border:3px solid #ff1f1f; background:repeating-linear-gradient(45deg, rgba(255,31,31,.85) 0 2px, rgba(255,31,31,.32) 2px 8px); }
   .abox span { white-space:nowrap; font:400 20px/1 Anton, Impact, sans-serif; color:#fff; text-transform:none; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; padding:2px 4px; text-align:center; }
   .apark { position:absolute; transform:translate(-17px, -50%); display:flex; align-items:center; gap:6px; pointer-events:none; }
-  .apark.mk-restroom { transform:translate(-21px, -50%); }
+  .apark.mk-restroom { transform:translate(-19px, -50%); }
   .apark.flip { flex-direction:row-reverse; transform:translate(calc(-100% + 17px), -50%); }
-  .apark.mk-restroom.flip { transform:translate(calc(-100% + 21px), -50%); }
+  .apark.mk-restroom.flip { transform:translate(calc(-100% + 19px), -50%); }
   .apark b { width:30px; height:30px; border-radius:7px; background:#1f6fd1; border:2px solid #fff; color:#fff; font:400 22px/28px Anton, Impact, sans-serif; text-align:center; }
-  .apark.mk-restroom b { width:38px; background:#0d8a6a; font-size:17px; }
+  .apark.mk-restroom b { width:34px; height:34px; background:#1f6fd1; font:20px/30px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif; }
   .apark span { font:800 15px/1 'Barlow Condensed', Arial, sans-serif; letter-spacing:.2em; color:#fff; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000; }
   .aer.editing[data-mode="box"] .apark { pointer-events:auto; cursor:move; }
   .abox.sel, .apark.sel { outline:3px dashed #ffd23f; outline-offset:2px; }
@@ -506,13 +506,14 @@ function showKit(home) {
   const W = S.data.wear; if (!W) return;
   if (!W.home) normalizeWear(S);
   const k = (W.kits === 'two' && !home) ? W.away : W.home;
-  W.big = k.big || ''; W.tag = k.tag || '';
+  W.big = k.big || ''; W.tag = k.tag || ''; W.photo = k.photo || '';
   const color = k.color || S.colors.primary;
   if (W.generic) W.generic.color = color;
   W.style = kitLum(color) > 150 ? 'light' : 'dark';
 }
 function normalizeWear(t) {
-  const W = t.data.wear; if (!W || W.home) return;
+  const W = t.data.wear; if (!W) return;
+  if (W.home) { if (W.photo && !W.home.photo && !W.away.photo) W.home.photo = W.photo; return; }
   const g = W.generic || {}, two = t.sport === 'flag' || t.sport === 'basketball';
   W.kits = two ? 'two' : 'one';
   W.home = { big: t.sport === 'flag' || t.sport === 'basketball' ? 'Home Jerseys' : (W.big || ''), tag: t.sport === 'flag' ? 'Dark' : t.sport === 'basketball' ? 'White · navy shorts' : (W.tag || ''), color: t.sport === 'basketball' ? '#f4f4f4' : (g.color || t.colors.primary) };
@@ -553,7 +554,7 @@ function blockHTML(id) {
         ${e.opp ? `<div class="vs"><span><small>${esc(e.oppLabel)}</small>${esc(e.opp)}</span></div>` : ''}
         ${S.on.times && d.times.rows.filter(x => x && (x.label || x.time)).length ? `<div class="times">${d.times.rows.filter(x => x && (x.label || x.time)).map(r => `<div class="pill${r.hot ? ' hot' : ''}"><b>${esc(r.label)}</b><i>${esc(r.time)}</i></div>`).join('')}</div>` : ''}
       </div>`;
-    case 'wear': { const w = d.wear, art = w.photo ? `<img src="${w.photo}" alt="">` : shirtSVG(w.generic, w.style === 'light' ? S.colors.primary : '#d8dcde'); return `
+    case 'wear': { const w = d.wear, art = w.photo ? `<img src="${picURL(w.photo)}" alt="">` : shirtSVG(w.generic, w.style === 'light' ? S.colors.primary : '#d8dcde'); return `
       <div class="chic jersey ${w.style}${art ? ' has' : ''}"><div class="txt"><div class="label">${esc(w.label)}</div><div class="big">${esc(w.big)}</div>${w.tag ? `<div class="tag">${esc(w.tag)}</div>` : ''}</div>${art}</div>`; }
     case 'map': { const m = d.map; return `
       <div class="chic field"><div class="hd"><div><div class="label">${esc(m.label)}</div><div class="big">${esc(m.big)}</div></div><div class="addr">${esc(m.address)}</div></div>
@@ -598,7 +599,7 @@ function boxDisp(m, bx) {
 // the highlighted box is whichever label matches the event's "where" (Field 3), so the schedule drives it
 const isOurs = (m, bx) => !markerOf(bx.label) && !!bx.label && !!m.big && bx.label.trim().toLowerCase() === m.big.trim().toLowerCase();
 // places that aren't fields: a labeled icon instead of a rectangle
-const MARKERS = { parking: { glyph: 'P', word: 'PARKING', label: 'Parking', re: /^p(arking)?$/i }, restroom: { glyph: 'WC', word: 'RESTROOMS', label: 'Restrooms', re: /^(wc|restrooms?|bathrooms?|toilets?|porta[- ]?(john|potty)s?)$/i } };
+const MARKERS = { parking: { glyph: 'P', word: 'PARKING', label: 'Parking', re: /^p(arking)?$/i }, restroom: { glyph: '🚻', word: 'RESTROOMS', label: 'Restrooms', re: /^(wc|restrooms?|bathrooms?|toilets?|porta[- ]?(john|potty)s?)$/i } };
 const markerOf = label => { const l = (label || '').trim(); for (const [key, m] of Object.entries(MARKERS)) if (m.re.test(l)) return { key, ...m }; return null; };
 function addMarker(key) {
   const m = S.data.map, mk = MARKERS[key]; if (!m.center || !mk) return;
@@ -667,6 +668,56 @@ async function fetchSquare(lat, lon, span) {
   const u = `https://imagery.nationalmap.gov/arcgis/rest/services/USGSNAIPPlus/ImageServer/exportImage?bbox=${x - h},${y - h},${x + h},${y + h}&bboxSR=3857&imageSR=3857&size=${px},${px}&format=jpg&f=image`;
   const r = await fetch(u); if (!r.ok) throw new Error('imagery ' + r.status);
   const bl = await r.blob(); return await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(bl); });
+}
+// Cut a shirt out of a photo on a plain background. No service, no model: the background is whatever
+// color fills the edges; it is flooded inward while the color stays close AND changes smoothly, so a white
+// shirt on white stops at its seam shading. A busy background (a kid on a field) is left alone.
+async function cutoutPhoto(dataUrl) {
+  const im = await loadImg(dataUrl), sc = Math.min(1, 900 / Math.max(im.width, im.height));
+  const W = Math.max(1, Math.round(im.width * sc)), H = Math.max(1, Math.round(im.height * sc));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(im, 0, 0, W, H);
+  const d = cx.getImageData(0, 0, W, H), px = d.data, N = W * H;
+  const border = []; for (let i = 0; i < W; i++) border.push(i, (H - 1) * W + i); for (let j = 1; j < H - 1; j++) border.push(j * W, j * W + W - 1);
+  const med = ch => { const v = border.map(k => px[k * 4 + ch]).sort((a, b) => a - b); return v[v.length >> 1]; };
+  const bg = [med(0), med(1), med(2)];
+  const toBg = k => Math.hypot(px[k * 4] - bg[0], px[k * 4 + 1] - bg[1], px[k * 4 + 2] - bg[2]);
+  const step = (a, b) => Math.abs(px[a * 4] - px[b * 4]) + Math.abs(px[a * 4 + 1] - px[b * 4 + 1]) + Math.abs(px[a * 4 + 2] - px[b * 4 + 2]);
+  const T = 30, S = 8, seen = new Uint8Array(N), q = [];
+  for (const k of border) if (!seen[k] && toBg(k) < T) { seen[k] = 1; q.push(k); }
+  while (q.length) {
+    const k = q.pop(), x0 = k % W, y0 = (k / W) | 0;
+    if (x0 > 0) { const n = k - 1; if (!seen[n] && toBg(n) < T && step(k, n) < S) { seen[n] = 1; q.push(n); } }
+    if (x0 < W - 1) { const n = k + 1; if (!seen[n] && toBg(n) < T && step(k, n) < S) { seen[n] = 1; q.push(n); } }
+    if (y0 > 0) { const n = k - W; if (!seen[n] && toBg(n) < T && step(k, n) < S) { seen[n] = 1; q.push(n); } }
+    if (y0 < H - 1) { const n = k + W; if (!seen[n] && toBg(n) < T && step(k, n) < S) { seen[n] = 1; q.push(n); } }
+  }
+  // islands: keep the shirt (the big pieces), drop leftover specks of background
+  const lab = new Int32Array(N), sizes = [0]; let nl = 0;
+  for (let k0 = 0; k0 < N; k0++) {
+    if (seen[k0] || lab[k0]) continue;
+    nl++; let sz = 0; const st = [k0]; lab[k0] = nl;
+    while (st.length) { const k = st.pop(); sz++; const x0 = k % W;
+      for (const n of [x0 > 0 ? k - 1 : -1, x0 < W - 1 ? k + 1 : -1, k - W, k + W]) if (n >= 0 && n < N && !seen[n] && !lab[n]) { lab[n] = nl; st.push(n); } }
+    sizes.push(sz);
+  }
+  const biggest = Math.max(0, ...sizes.slice(1));
+  for (let k = 0; k < N; k++) if (!seen[k] && sizes[lab[k]] < biggest * .03) seen[k] = 1;
+  let removed = 0; for (let k = 0; k < N; k++) removed += seen[k];
+  const frac = removed / N;
+  if (frac < .08 || frac > .96) return { url: dataUrl, cut: false };
+  let x1 = W, y1 = H, x2 = 0, y2 = 0;
+  for (let k = 0; k < N; k++) {
+    if (seen[k]) { px[k * 4 + 3] = 0; continue; }
+    const x0 = k % W, y0 = (k / W) | 0;
+    const edge = (x0 > 0 && seen[k - 1]) || (x0 < W - 1 && seen[k + 1]) || (y0 > 0 && seen[k - W]) || (y0 < H - 1 && seen[k + W]);
+    if (edge) px[k * 4 + 3] = Math.max(90, Math.min(255, toBg(k) * 5));      // a soft edge, not a jagged one
+    if (x0 < x1) x1 = x0; if (x0 > x2) x2 = x0; if (y0 < y1) y1 = y0; if (y0 > y2) y2 = y0;
+  }
+  cx.putImageData(d, 0, 0);
+  const out = document.createElement('canvas'), pad = 2; out.width = x2 - x1 + 1 + pad * 2; out.height = y2 - y1 + 1 + pad * 2;
+  out.getContext('2d').drawImage(cv, x1, y1, x2 - x1 + 1, y2 - y1 + 1, pad, pad, x2 - x1 + 1, y2 - y1 + 1);
+  return { url: out.toDataURL('image/png'), cut: true };
 }
 const loadImg = src => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
 async function composeAerial(m) {
@@ -897,12 +948,12 @@ function fieldsFor(id) {
     case 'wear': { const W = get('data.wear'); if (!W.home) normalizeWear(S);
       const sel = (path, label, opts) => `<label class="fld" for="${fid(path)}"><span>${label}</span><select id="${fid(path)}" data-path="${path}">${opts.map(([v, n]) => `<option value="${v}"${get(path) === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
       const two = W.kits === 'two';
-      const kit = (k, title) => `${title ? `<p class="eyebrow" style="grid-column:1/-1;margin:6px 0 0">${title}</p>` : ''}${F(`data.wear.${k}.big`, 'What to wear')}${F(`data.wear.${k}.tag`, 'Small note under it')}${F(`data.wear.${k}.color`, 'Shirt color', { type: 'color' })}`;
+      const kit = (k, title) => `${title ? `<p class="eyebrow" style="grid-column:1/-1;margin:6px 0 0">${title}</p>` : ''}${F(`data.wear.${k}.big`, 'What to wear')}${F(`data.wear.${k}.tag`, 'Small note under it')}${F(`data.wear.${k}.color`, 'Shirt color', { type: 'color' })}${FILE(`data.wear.${k}.photo`, two ? `Photo of the ${k} jersey (optional). One shirt on a plain background cuts out best.` : 'Photo of the jersey (optional). One shirt on a plain background cuts out best.')}`;
       return `<div class="fld wide"><span>Does the team wear the same thing every game?</span><div class="seg" role="group" aria-label="Jerseys"><button data-act="kits" data-id="one" aria-pressed="${!two}">One jersey</button><button data-act="kits" data-id="two" aria-pressed="${two}">Home &amp; away</button></div></div>`
       + (two ? kit('home', 'Home games') + kit('away', 'Away games') : kit('home', ''))
-      + `<details class="more" style="grid-column:1/-1"><summary>Shirt picture</summary><div class="flds"><p class="hint">No photo handy, or the only photo has a kid in it? Use the drawn shirt. A photo needs a flat shot of just the shirt.</p>`
+      + `<details class="more" style="grid-column:1/-1"><summary>Drawn shirt (used when there is no photo)</summary><div class="flds">`
       + sel('data.wear.generic.shape', 'Drawn shirt', [['tshirt', 'T-shirt'], ['', 'None']]) + sel('data.wear.generic.glyph', 'Mark on it', [['none', 'None'], ['soccer', 'Soccer ball'], ['football', 'Football'], ['basketball', 'Basketball']])
-      + FILE('data.wear.photo', 'Or a photo of the shirt') + `</div></details>`; }
+      + `</div></details>`; }
     case 'map': if (!matchMedia('(min-width: 900px)').matches) return mapFieldsPhone();
     { const m = get('data.map'); if (typeof m.pin === 'string') { m.pin_label = m.pin; m.pin = null; }
       return F('data.map.label', 'Small label') + F('data.map.big', 'Big line') + F('data.map.address', 'Address', { area: true, wide: true })
@@ -943,7 +994,7 @@ function mapFieldsPhone() {
         ${FILE('data.map.own', 'Or use your own map picture (replaces the aerial)')}
       </div></details>`;
 }
-const teamFields = () => `<div class="flds">${FILE('data.wear.photo', 'Upload a photo of the jersey and the colors are pulled from it', '-team')}${F('colors.primary', 'Team color', { type: 'color' })}${F('colors.deep', 'Dark background', { type: 'color' })}${F('colors.accent', 'Accent', { type: 'color' })}<p class="hint">${S.colorway ? `Looks like <b>${esc(S.colorway)}</b>. ` : ''}The three swatches are only there if you want to override what the photo gave you.</p></div>`;
+const teamFields = () => `<div class="flds">${FILE('data.wear.home.photo', 'Upload a photo of the jersey and the colors are pulled from it', '-team')}${F('colors.primary', 'Team color', { type: 'color' })}${F('colors.deep', 'Dark background', { type: 'color' })}${F('colors.accent', 'Accent', { type: 'color' })}<p class="hint">${S.colorway ? `Looks like <b>${esc(S.colorway)}</b>. ` : ''}The three swatches are only there if you want to override what the photo gave you.</p></div>`;
 const presetSeg = () => `<div class="seg" role="group" aria-label="Sport preset">${[['flag', 'Flag football'], ['wrestling', 'Wrestling']].map(([k, n]) => `<button data-act="preset" data-id="${k}" aria-pressed="${S.sport === k}">${n}</button>`).join('')}</div>`;
 const chips = () => `<div class="chips">${Object.entries(BLOCKS).map(([id, b]) => `<button class="chip" data-act="toggle" data-id="${id}" aria-pressed="${!!S.on[id]}"${b.locked ? ' disabled' : ''}><b>${b.name}</b><small>${b.hint}</small></button>`).join('')}</div>`;
 const sendPanel = () => `<div class="panel send sendp"><p class="eyebrow">Send it</p>
@@ -1405,7 +1456,7 @@ document.addEventListener('click', ev => {
   else if (act === 'sstep') { UI.selBox = null; UI.sstep = Math.max(0, (UI.sstep || 0) + +id); render(); window.scrollTo(0, 0); return; }
   else if (act === 'add') (Array.isArray(getSafe(path)) ? get(path) : (set(path, []), get(path))).push({ ...(LIST_BLANK[path] || (path.endsWith('.times') ? LIST_BLANK['data.times.rows'] : {})) });
   else if (act === 'del') { const a = getSafe(path); if (Array.isArray(a)) a.splice(+b.dataset.i, 1); }
-  else if (act === 'clear') set(path, '');
+  else if (act === 'clear') { set(path, ''); if (/^data\.wear\./.test(path)) applyEvent(S.cur); }
   else if (act === 'copyPic') return copyPicture();
   else if (act === 'copyText') return copyText();
   else if (act === 'teamLink') return teamLink();
@@ -1469,7 +1520,17 @@ document.addEventListener('change', ev => {
   if (!t.dataset.file || !t.files[0]) return;
   const path = t.dataset.file;
   const r = new FileReader();
-  r.onload = () => { set(path, r.result); render(); if (path === 'data.wear.photo') paletteFrom(r.result); };
+  r.onload = async () => {
+    const isShirt = /^data\.wear\.(home|away)?\.?photo$/.test(path);
+    if (isShirt) {
+      let res = { url: r.result, cut: false }; try { res = await cutoutPhoto(r.result); } catch (e) {}
+      set(path, res.url); applyEvent(S.cur); render();
+      if (path === 'data.wear.home.photo') paletteFrom(r.result);
+      if (!res.cut) overlay('<p class="eyebrow">Photo added as it is</p><p style="margin:0">I could not find a plain background to remove, so the whole photo is used. A picture of just the shirt on a plain wall or floor cuts out cleanly.</p>');
+      return;
+    }
+    set(path, r.result); render();
+  };
   r.readAsDataURL(t.files[0]);
 });
 
@@ -1580,7 +1641,7 @@ async function unsqueeze(str) { return JSON.parse(await pipe(unb64u(str), new De
 async function teamLink() {
   S.id = S.id || rid(); saveApp();
   // pictures are too big to ride in a link; they stay on the device that added them
-  const t = JSON.parse(JSON.stringify(S)); t.data.wear.photo = ''; t.data.map.own = ''; t.data.map.img = ''; t.data.map.raw = '';
+  const t = JSON.parse(JSON.stringify(S)); t.data.wear.photo = ''; if (t.data.wear.home) t.data.wear.home.photo = ''; if (t.data.wear.away) t.data.wear.away.photo = ''; t.data.map.own = ''; t.data.map.img = ''; t.data.map.raw = '';
   const url = `${location.origin}${location.pathname}#t=${await squeeze(t)}`;
   overlay(`<p class="eyebrow">Team link · ${esc(S.data.event.team)}</p><p style="margin:0">Open this link on any phone or computer and the team is there, schedule and all. Anyone you send it to gets a copy, so share it with co-coaches only.</p>
     <textarea readonly id="linkOut" style="min-height:96px;font-size:11.5px;word-break:break-all">${esc(url)}</textarea>
@@ -1594,7 +1655,7 @@ function scrubImport(t) {
   t.colors = t.colors || {};
   for (const k of ['primary', 'deep', 'accent']) t.colors[k] = hex(t.colors[k]) || ex.colors[k];
   if (!t.data.wear) t.data.wear = ex.data.wear;
-  t.data.wear.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = ''; t.data.map.img = ''; t.data.map.raw = '';
+  t.data.wear.photo = ''; if (t.data.wear.home) t.data.wear.home.photo = ''; if (t.data.wear.away) t.data.wear.away.photo = ''; if (!t.data.map) t.data.map = ex.data.map; t.data.map.own = ''; t.data.map.img = ''; t.data.map.raw = '';
   if (Array.isArray(t.data.map.boxes)) t.data.map.boxes = t.data.map.boxes.filter(b => b && [b.x0, b.y0, b.x1, b.y1].every(n => typeof n === 'number' && isFinite(n))).map(b => ({ x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1, label: String(b.label || '').slice(0, 40) }));
   if (t.data.map.pin && typeof t.data.map.pin === 'object' && !(typeof t.data.map.pin.mx === 'number' && isFinite(t.data.map.pin.mx))) { delete t.data.map.pin.mx; delete t.data.map.pin.my; }
   if (t.data.map.center && !(typeof t.data.map.center.lat === 'number' && typeof t.data.map.center.lon === 'number')) delete t.data.map.center;
@@ -1613,7 +1674,7 @@ async function importFromLink() {
   const i = APP.teams.findIndex(x => x.id && x.id === t.id);
   if (i >= 0) {
     const old = APP.teams[i];
-    t.data.wear.photo = old.data.wear.photo || ''; t.data.map.own = old.data.map.own || ''; t.data.map.img = old.data.map.img || ''; t.data.map.raw = old.data.map.raw || '';
+    t.data.wear.photo = old.data.wear.photo || ''; if (t.data.wear.home && old.data.wear.home) t.data.wear.home.photo = old.data.wear.home.photo || ''; if (t.data.wear.away && old.data.wear.away) t.data.wear.away.photo = old.data.wear.away.photo || ''; t.data.map.own = old.data.map.own || ''; t.data.map.img = old.data.map.img || ''; t.data.map.raw = old.data.map.raw || '';
     if (JSON.stringify(old) !== JSON.stringify(t) && !confirm(`Replace ${old.data.event.team} on this device with the copy in the link?`)) return;
     APP.teams[i] = t; APP.ti = i;
   } else {
