@@ -684,6 +684,7 @@ async function cutoutPhoto(dataUrl) {
   const toBg = k => Math.hypot(px[k * 4] - bg[0], px[k * 4 + 1] - bg[1], px[k * 4 + 2] - bg[2]);
   const step = (a, b) => Math.abs(px[a * 4] - px[b * 4]) + Math.abs(px[a * 4 + 1] - px[b * 4 + 1]) + Math.abs(px[a * 4 + 2] - px[b * 4 + 2]);
   const T = 30, S = 8, seen = new Uint8Array(N), q = [];
+  if (border.filter(k => toBg(k) > T).length / border.length > .25) return { url: dataUrl, cut: false };
   for (const k of border) if (!seen[k] && toBg(k) < T) { seen[k] = 1; q.push(k); }
   while (q.length) {
     const k = q.pop(), x0 = k % W, y0 = (k / W) | 0;
@@ -706,12 +707,47 @@ async function cutoutPhoto(dataUrl) {
   let removed = 0; for (let k = 0; k < N; k++) removed += seen[k];
   const frac = removed / N;
   if (frac < .08 || frac > .96) return { url: dataUrl, cut: false };
+  const isEdge = k => { const x0 = k % W, y0 = (k / W) | 0; return (x0 > 0 && seen[k - 1]) || (x0 < W - 1 && seen[k + 1]) || (y0 > 0 && seen[k - W]) || (y0 < H - 1 && seen[k + W]); };
+  // pass 1: shave the halo — an edge pixel closer to the background than to the shirt beside it is background (twice, for 2-px rims)
+  const shirtNear = k => { const x0 = k % W, y0 = (k / W) | 0; let r = 0, g = 0, b = 0, n = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const xx = x0 + dx, yy = y0 + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; const nb = yy * W + xx; if (!seen[nb] && !isEdge(nb)) { r += px[nb * 4]; g += px[nb * 4 + 1]; b += px[nb * 4 + 2]; n++; } }
+    return n ? [r / n, g / n, b / n] : null; };
+  for (let pass = 0; pass < 2; pass++) {
+    const shave = [];
+    for (let k = 0; k < N; k++) {
+      if (seen[k] || !isEdge(k)) continue;
+      const sh = shirtNear(k); if (!sh) continue;
+      const dShirt = Math.hypot(px[k * 4] - sh[0], px[k * 4 + 1] - sh[1], px[k * 4 + 2] - sh[2]);
+      if (toBg(k) < dShirt) shave.push(k);
+    }
+    for (const k of shave) seen[k] = 1;
+  }
+  // spurs and crumbs left by the shave: a pixel with 3+ background neighbors goes; then small islands go again
+  for (let pass = 0; pass < 2; pass++) {
+    const spur = [];
+    for (let k = 0; k < N; k++) { if (seen[k]) continue; const x0 = k % W, y0 = (k / W) | 0;
+      const nb = (x0 === 0 || seen[k - 1]) + (x0 === W - 1 || seen[k + 1]) + (y0 === 0 || seen[k - W]) + (y0 === H - 1 || seen[k + W]);
+      if (nb >= 3) spur.push(k); }
+    for (const k of spur) seen[k] = 1;
+  }
+  { const lab2 = new Int32Array(N), sz2 = [0]; let m = 0;
+    for (let k0 = 0; k0 < N; k0++) { if (seen[k0] || lab2[k0]) continue; m++; let z = 0; const st = [k0]; lab2[k0] = m;
+      while (st.length) { const k = st.pop(); z++; const x0 = k % W; for (const n of [x0 > 0 ? k - 1 : -1, x0 < W - 1 ? k + 1 : -1, k - W, k + W]) if (n >= 0 && n < N && !seen[n] && !lab2[n]) { lab2[n] = m; st.push(n); } }
+      sz2.push(z); }
+    const big = Math.max(0, ...sz2.slice(1)); for (let k = 0; k < N; k++) if (!seen[k] && sz2[lab2[k]] < big * .03) seen[k] = 1; }
   let x1 = W, y1 = H, x2 = 0, y2 = 0;
+  const src = new Uint8ClampedArray(px);
   for (let k = 0; k < N; k++) {
     if (seen[k]) { px[k * 4 + 3] = 0; continue; }
     const x0 = k % W, y0 = (k / W) | 0;
-    const edge = (x0 > 0 && seen[k - 1]) || (x0 < W - 1 && seen[k + 1]) || (y0 > 0 && seen[k - W]) || (y0 < H - 1 && seen[k + W]);
-    if (edge) px[k * 4 + 3] = Math.max(90, Math.min(255, toBg(k) * 5));      // a soft edge, not a jagged one
+    if (isEdge(k)) {
+      // pass 2: the edge takes its color from the shirt pixels next to it, so no light rim on a dark card
+      let r = 0, g = 0, b = 0, n = 0;
+      for (const nb of [x0 > 0 ? k - 1 : -1, x0 < W - 1 ? k + 1 : -1, k - W, k + W, k - W - 1, k - W + 1, k + W - 1, k + W + 1])
+        if (nb >= 0 && nb < N && !seen[nb] && !isEdge(nb)) { r += src[nb * 4]; g += src[nb * 4 + 1]; b += src[nb * 4 + 2]; n++; }
+      if (n) { px[k * 4] = r / n; px[k * 4 + 1] = g / n; px[k * 4 + 2] = b / n; }
+      px[k * 4 + 3] = 200;                                                 // slightly soft, not jagged
+    }
     if (x0 < x1) x1 = x0; if (x0 > x2) x2 = x0; if (y0 < y1) y1 = y0; if (y0 > y2) y2 = y0;
   }
   cx.putImageData(d, 0, 0);
