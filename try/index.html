@@ -860,8 +860,8 @@ async function borderBusy(dataUrl) {
     for (let i = 0; i < W; i++) ring.push(i); for (let j = 1; j < H; j++) ring.push(j * W + W - 1);
     for (let i = W - 2; i >= 0; i--) ring.push((H - 1) * W + i); for (let j = H - 2; j > 0; j--) ring.push(j * W);
     let n = 0; for (let i = 0; i < ring.length; i++) { const a = ring[i] * 4, b = ring[(i + 1) % ring.length] * 4;
-      if (Math.abs(px[a] - px[b]) + Math.abs(px[a + 1] - px[b + 1]) + Math.abs(px[a + 2] - px[b + 2]) > 24) n++; }
-    return n / ring.length > .1; } catch (e) { return false; }
+      if (Math.abs(px[a] - px[b]) + Math.abs(px[a + 1] - px[b + 1]) + Math.abs(px[a + 2] - px[b + 2]) > 16) n++; }
+    return n / ring.length > .08; } catch (e) { return false; }
 }
 async function seeThrough(dataUrl) {
   if (!/^data:image\/(png|webp)/.test(dataUrl)) return false;
