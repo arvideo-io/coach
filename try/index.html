@@ -529,7 +529,7 @@ function normalizeWear(t) {
 function applyEvent(i) {
   const r = S.season[i]; if (!r) return; S.cur = i;
   const e = S.data.event, flag = S.sport === 'flag', weekly = S.sport !== 'wrestling';
-  e.date = r.date; e.opp = r.opp; e.accent = r.label; e.ghost = weekly ? r.label.replace(/\D/g, '') || 'G' : 'W';
+  e.date = r.date; e.opp = r.opp; e.accent = r.label; e.ghost = weekly ? String(r.label || '').replace(/\D/g, '') || 'G' : 'W';
   e.oppLabel = r.home ? 'VS.' : 'AT'; e.sub = flag ? 'Flag Football' : S.sport === 'soccer' ? 'Soccer' : (r.home ? 'Home' : 'Away');
   if (r.times) { if (!Array.isArray(r.times)) r.times = Object.values(r.times); S.data.times.rows = r.times; }
   if (r.venue) e.venue = r.venue;
@@ -574,9 +574,9 @@ function blockHTML(id) {
       <div class="chic bring"><div class="label">Don't forget</div><div class="big">Bring</div>
         <div class="grid">${d.bring.items.map(i => `<div class="it"><div class="e">${esc(i.e)}</div><b>${esc(i.label)}</b></div>`).join('')}</div></div>`;
     case 'note': return `<div class="chic notebk"><div class="label">Coach's note</div><div class="big">${esc(d.note.title)}</div><p>${esc(d.note.text)}</p></div>`;
-    case 'link': return `<div class="chic linkb"><div class="label">${esc(d.link.label)}</div>${d.link.vol ? `<div class="vol">${esc(d.link.vol)}</div>` : ''}<div class="go">${esc(d.link.button)}: ${esc(d.link.url.replace(/^https?:\/\/(www\.)?/, ''))}</div></div>`;
+    case 'link': return `<div class="chic linkb"><div class="label">${esc(d.link.label)}</div>${d.link.vol ? `<div class="vol">${esc(d.link.vol)}</div>` : ''}<div class="go">${esc(d.link.button)}: ${esc(String(d.link.url || '').replace(/^https?:\/\/(www\.)?/, ''))}</div></div>`;
     case 'coach': return `
-      <div class="chic qs"><div class="label">Questions?</div><div class="big">Reach the coaches</div><div class="coaches">${d.coach.list.map(c => `
+      <div class="chic qs"><div class="label">Questions?</div><div class="big">Reach the coaches</div><div class="coaches">${coachRows().map(c => `
         <div class="coach"><div><div class="nm">${esc(c.name)}</div><div class="ct">${esc(c.phone)}<br>${esc(c.email)}</div></div></div>`).join('')}</div></div>`;
   }
   return '';
@@ -964,7 +964,7 @@ async function findOnMap(recenter) {
   if (st) st.textContent = 'Looking up the address…';
   try {
     if (!m.center || recenter) {
-      const g = await geocode(m.address.replace(/\n/g, ', ')); m.center = { lat: g.lat, lon: g.lon }; m.span = m.span || 240; m.rot = m.rot || 0; m.boxes = [];
+      const g = await geocode(String(m.address || '').replace(/\n/g, ', ')); m.center = { lat: g.lat, lon: g.lon }; m.span = m.span || 240; m.rot = m.rot || 0; m.boxes = [];
       const keep = (m.pin && typeof m.pin === 'object' && m.pin.label) || m.pin_label || (typeof m.pin === 'string' ? m.pin : ''); const [pmx, pmy] = merc(g.lat, g.lon); m.pin = { mx: pmx, my: pmy, label: keep };
     }
     if (st) st.textContent = 'Fetching the aerial…';
@@ -1051,14 +1051,17 @@ function shirtSVG(g, bg) {
   return `<svg class="shirt" viewBox="-12 -12 280 280" aria-hidden="true"><path d="${SHAPES[g.shape]}" fill="${g.color}"${ol ? ` stroke="${ol}" stroke-width="14" stroke-linejoin="round" paint-order="stroke"` : ''}/>${mark}</svg>`;
 }
 
+// half-filled rows (a coach with only an email typed so far) must not break the email
+const coachRows = () => (S.data.coach.list || []).filter(Boolean).map(c => ({ name: String(c.name || ''), phone: String(c.phone || ''), email: String(c.email || '') }));
+const addrOf = () => String(S.data.map.address || '');
 function footerLines() {
   const d = S.data, e = d.event, L = [];
   const tit = `${e.team} ${e.accent}${e.opp ? ` ${e.oppLabel} ${e.opp}` : ''}`.toUpperCase();
   L.push({ b: tit, t: ` · ${e.date} · ${e.venue}` });
   if (S.on.times) L.push({ t: d.times.rows.filter(r => r && (r.label || r.time)).map(r => [r.label, r.time].filter(Boolean).join(' ')).join(' · ') });
-  if (S.on.map) L.push({ a: `Directions to ${e.venue}`, href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.map.address.replace(/\n/g, ', '))}` });
+  if (S.on.map) L.push({ a: `Directions to ${e.venue}`, href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addrOf().replace(/\n/g, ', '))}` });
   if (S.on.link) L.push({ t: d.link.vol ? `${d.link.vol} · ` : '', a: d.link.button, href: d.link.url });
-  if (S.on.coach) d.coach.list.forEach(c => L.push({ t: `Questions? ${c.name} · `, a: c.phone, href: `sms:${c.phone.replace(/\D/g, '')}`, t2: ' · ', a2: c.email, href2: `mailto:${c.email}` }));
+  if (S.on.coach) coachRows().forEach(c => L.push({ t: `Questions? ${c.name} · `, a: c.phone, href: `sms:${c.phone.replace(/\D/g, '')}`, t2: ' · ', a2: c.email, href2: `mailto:${c.email}` }));
   return L;
 }
 // the live-HTML bottom of the email, ported from flag-emails build_email.py coaches_html(): same font stack, weights,
@@ -1073,19 +1076,19 @@ function footerHTML(flat) {
   const gap = '<td width="6" style="font-size:0;line-height:0;">&nbsp;</td>';
   const buttons = (cells, align) => `<table role="presentation" cellpadding="0" cellspacing="0" align="${align}"><tr>${cells.join(gap)}</tr></table>`;
   const muted = (href, t) => `<a href="${esc(href)}" style="color:#b9c0c7;text-decoration:none;"><span style="color:#b9c0c7;">${esc(t)}</span></a>`;
-  const head = (lab, big) => `<tr><td align="left" style="padding:16px 18px 4px;font-family:${font};text-align:left;"><div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#9aa3aa;">${esc(lab.toUpperCase())}</div><div style="font-size:24px;font-weight:900;color:#ffffff;margin-top:4px;word-break:break-word;overflow-wrap:anywhere;">${esc(big.toUpperCase())}</div></td></tr>`;
+  const head = (lab = '', big = '') => `<tr><td align="left" style="padding:16px 18px 4px;font-family:${font};text-align:left;"><div style="font-size:11px;font-weight:700;letter-spacing:3px;color:#9aa3aa;">${esc(String(lab).toUpperCase())}</div><div style="font-size:24px;font-weight:900;color:#ffffff;margin-top:4px;word-break:break-word;overflow-wrap:anywhere;">${esc(String(big).toUpperCase())}</div></td></tr>`;
   const cardT = (inner, id) => `<tr data-blk="${id}"><td style="padding:0 12px 12px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${card}" style="background:${card};border-radius:18px;">${inner}</table></td></tr>`;
   let h = '';
   if (S.on.map || S.on.link) {
     const b = [];
-    if (S.on.map) b.push(fill(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.map.address.replace(/\n/g, ', '))}`, 'DIRECTIONS'));
-    if (S.on.link) b.push(ghost(d.link.url, d.link.button.toUpperCase()));
-    const sub = S.on.map ? `<div style="font-size:12px;line-height:18px;margin-top:2px;color:#b9c0c7;word-break:break-word;overflow-wrap:anywhere;">${esc(d.map.address.replace(/\n/g, ' · '))}</div>` : '';
+    if (S.on.map) b.push(fill(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addrOf().replace(/\n/g, ', '))}`, 'DIRECTIONS'));
+    if (S.on.link) b.push(ghost(String(d.link.url || ''), String(d.link.button || '').toUpperCase()));
+    const sub = S.on.map ? `<div style="font-size:12px;line-height:18px;margin-top:2px;color:#b9c0c7;word-break:break-word;overflow-wrap:anywhere;">${esc(addrOf().replace(/\n/g, ' · '))}</div>` : '';
     const vol = S.on.link && d.link.vol ? `<div style="font-size:14px;font-weight:700;line-height:20px;margin-top:8px;color:#ffffff;word-break:break-word;overflow-wrap:anywhere;">${esc(d.link.vol)}</div>` : '';
     h += cardT(head(S.on.map ? 'Get there' : d.link.label, S.on.map ? e.venue : d.link.button) + `<tr><td align="left" style="padding:0 18px 16px;font-family:${font};color:#ffffff;text-align:left;">${sub}${vol}<div style="margin-top:12px;">${buttons(b, 'left')}</div></td></tr>`, S.on.link ? 'link' : 'map');
   }
   if (S.on.coach) {
-    const rows = d.coach.list.map((c, i) => `<tr><td align="left" style="padding:12px 0;text-align:left;${i ? `border-top:1px solid ${rule};` : ''}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    const rows = coachRows().map((c, i) => `<tr><td align="left" style="padding:12px 0;text-align:left;${i ? `border-top:1px solid ${rule};` : ''}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
       <td align="left" width="100%" style="font-family:${font};color:#ffffff;vertical-align:middle;text-align:left;word-break:break-word;overflow-wrap:anywhere;"><div style="font-size:17px;font-weight:800;letter-spacing:.5px;word-break:break-word;overflow-wrap:anywhere;">${esc(c.name.toUpperCase())}</div><div style="font-size:12px;line-height:18px;margin-top:2px;word-break:break-word;overflow-wrap:anywhere;">${muted(`sms:${c.phone.replace(/\D/g, '')}`, c.phone)}<br>${muted(`mailto:${c.email}`, c.email)}</div></td>
       <td align="right" style="vertical-align:middle;white-space:nowrap;">${buttons([fill(`sms:${c.phone.replace(/\D/g, '')}`, 'TEXT'), ghost(`mailto:${c.email}`, 'EMAIL')], 'right')}</td></tr></table></td></tr>`).join('');
     h += cardT(head('Questions?', 'Text or email the coaches') + `<tr><td style="padding:4px 18px 6px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>`, 'coach');
