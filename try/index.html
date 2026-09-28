@@ -1134,7 +1134,7 @@ const getSafe = path => { try { return get(path); } catch (e) { return ''; } };
 const F = (path, label, o = {}) => `<label class="fld${o.wide ? ' wide' : ''}" for="${fid(path)}"><span>${label}</span>${
   o.area ? `<textarea id="${fid(path)}" data-path="${path}" rows="3">${esc(getSafe(path))}</textarea>`
          : `<input id="${fid(path)}" type="${o.type || 'text'}" data-path="${path}" value="${esc(getSafe(path))}">`}</label>`;
-const FILE = (path, label, sfx = '') => `<label class="fld wide" for="${fid(path) + sfx}"><span>${label}</span><input id="${fid(path) + sfx}" type="file" accept="image/*" data-file="${path}">${get(path) ? `<button class="add" data-act="clear" data-path="${path}">Remove image</button>` : ''}</label>`;
+const FILE = (path, label, sfx = '') => `<label class="fld wide" for="${fid(path) + sfx}"><span>${label}</span><input id="${fid(path) + sfx}" type="file" accept="image/*" data-file="${path}"><button class="add" data-act="pastePic" data-path="${path}">Paste image</button>${get(path) ? `<button class="add" data-act="clear" data-path="${path}">Remove image</button>` : ''}</label>`;
 function LIST(path, cols, addLabel) {
   if (!Array.isArray(getSafe(path))) set(path, Array.isArray(Object.values(getSafe(path) || {})) ? Object.values(getSafe(path) || {}) : []);
   return `<div class="rows">${get(path).map((r, i) => `<div class="row">${cols.map(c => c.check
@@ -1679,6 +1679,7 @@ document.addEventListener('click', ev => {
   else if (act === 'photoPick') { const P = UI.photoPick; UI.photoPick = null; $('#overlay').innerHTML = ''; if (P && P.urls[+id]) useShirt(P.path, P.urls[+id]).then(render); else render(); return; }
   else if (act === 'photoGPT') { gptCopy(); return; }
   else if (act === 'photoShare') { gptShare(); return; }
+  else if (act === 'pastePic') { pastePic(path); return; }
   else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
   render();
   if (act === 'step') window.scrollTo(0, 0);
@@ -1725,7 +1726,11 @@ document.addEventListener('change', ev => {
   if (!t.dataset.file || !t.files[0]) return;
   const path = t.dataset.file;
   const r = new FileReader();
-  r.onload = async () => {
+  r.onload = () => takePhoto(path, r.result);
+  r.readAsDataURL(t.files[0]);
+});
+async function takePhoto(path, dataUrl) {
+    const r = { result: dataUrl };
     const isShirt = /^data\.wear\.(home|away)?\.?photo$/.test(path);
     if (isShirt) {
       if (await seeThrough(r.result)) { const t = await trimClear(r.result); await useShirt(path, t); render(); if (path === 'data.wear.home.photo') paletteFrom(t); return; }
@@ -1746,8 +1751,33 @@ document.addEventListener('change', ev => {
       return;
     }
     set(path, r.result); render();
-  };
-  r.readAsDataURL(t.files[0]);
+}
+// Paste: phones copy pictures far more easily than they save them to files
+const blobToURL = b => new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); });
+async function pastePic(path) {
+  try {
+    for (const it of await navigator.clipboard.read()) {
+      const ty = it.types.find(x => x.startsWith('image/'));
+      if (ty) return takePhoto(path, await blobToURL(await it.getType(ty)));
+    }
+    overlay('<p class="eyebrow">Nothing to paste</p><p style="margin:0">There’s no picture copied right now. Copy one, then tap Paste image again.</p>');
+  } catch (e) { pasteBox(path); }
+}
+// where the browser won't hand the clipboard over on a tap, the phone's own Paste still works in an editable box
+function pasteBox(path) {
+  UI.pastePath = path;
+  $('#overlay').innerHTML = `<div class="ov"><div class="box"><p class="eyebrow">Paste the picture</p>
+    <div id="pasteZone" contenteditable="true" aria-label="Paste the picture here" style="min-height:120px;border:2px dashed var(--line);border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:center;text-align:center;color:inherit">Press and hold here, then tap Paste</div>
+    <div style="margin-top:12px"><button class="btn alt" data-act="closeOv">Cancel</button></div></div></div>`;
+  setTimeout(() => { const z = $('#pasteZone'); if (z) z.focus(); }, 30);
+}
+document.addEventListener('paste', ev => {
+  if (!ev.target.closest || !ev.target.closest('#pasteZone') || !UI.pastePath) return;
+  ev.preventDefault();
+  const f = [...(ev.clipboardData && ev.clipboardData.files || [])].find(x => x.type.startsWith('image/'));
+  const path = UI.pastePath; UI.pastePath = null; $('#overlay').innerHTML = '';
+  if (f) blobToURL(f).then(u => takePhoto(path, u));
+  else overlay('<p class="eyebrow">Nothing to paste</p><p style="margin:0">There’s no picture copied right now. Copy one, then tap Paste image again.</p>');
 });
 
 /* team colors pulled from the jersey photo: the pickers stay as an override, not a chore */
