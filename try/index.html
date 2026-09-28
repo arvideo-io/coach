@@ -841,6 +841,39 @@ async function cutoutChoices(dataUrl) {
 }
 // the coach's own ChatGPT does the cut-out when ours can't; we only copy the photo and fill in the ask
 const GPT_PROMPT = 'I am pasting a photo of a sports jersey. Cut out just the jersey (or jerseys) and give it back as a PNG with a transparent background. Keep the colors, numbers and logos exactly as they are, do not redraw anything.';
+// built synchronously from the data URL, so the share stays inside the tap (Safari drops it after an await)
+function photoFile(dataUrl) {
+  const [head, b64] = dataUrl.split(','), type = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+  const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return new File([u], 'jersey.' + (type.split('/')[1] || 'jpg').replace('jpeg', 'jpg'), { type });
+}
+function canShareFile() {
+  try { return matchMedia('(pointer: coarse)').matches && !!navigator.canShare && navigator.canShare({ files: [new File([new Uint8Array(1)], 'x.jpg', { type: 'image/jpeg' })] }); } catch (e) { return false; }
+}
+function gptShare() {
+  const P = UI.photoPick; if (!P) return;
+  try { navigator.share({ files: [photoFile(P.orig)], text: GPT_PROMPT }).catch(() => {}); } catch (e) {}
+}
+// the kit's shirt color comes from the photo: the most common color on the shirt itself (see-through and backdrop skipped)
+async function useShirt(path, url) {
+  set(path, url);
+  const kit = (path.match(/^data\.wear\.(home|away)\.photo$/) || [])[1];
+  if (kit) try {
+    const im = await loadImg(url), n = 64, c = document.createElement('canvas'); c.width = c.height = n;
+    const x = c.getContext('2d'); x.drawImage(im, 0, 0, n, n); const px = x.getImageData(0, 0, n, n).data;
+    const bg = [0, (n - 1) * 4, n * (n - 1) * 4, (n * n - 1) * 4].map(i => [px[i], px[i + 1], px[i + 2], px[i + 3]]).reduce((a, q) => a.map((v, k) => v + q[k] / 4), [0, 0, 0, 0]);
+    const bins = {};
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i + 3] < 128) continue;
+      if (bg[3] > 128 && Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) < 70) continue;
+      const k = (px[i] >> 5) << 6 | (px[i + 1] >> 5) << 3 | (px[i + 2] >> 5), o = bins[k] || (bins[k] = { n: 0, r: 0, g: 0, b: 0 });
+      o.n++; o.r += px[i]; o.g += px[i + 1]; o.b += px[i + 2];
+    }
+    const top = Object.values(bins).sort((a, b) => b.n - a.n)[0];
+    if (top && top.n > 40) set(`data.wear.${kit}.color`, '#' + [top.r, top.g, top.b].map(v => Math.round(v / top.n).toString(16).padStart(2, '0')).join(''));
+  } catch (e) {}
+  applyEvent(S.cur);
+}
 function gptCopy() {
   const P = UI.photoPick, b = $('#gptCopy'); if (!P || !b) return;
   const png = loadImg(P.orig).then(im => new Promise(res => { const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; c.getContext('2d').drawImage(im, 0, 0); c.toBlob(res, 'image/png'); }));
@@ -1625,8 +1658,9 @@ document.addEventListener('click', ev => {
   else if (act === 'impReadPaste') { const t = $('#impPaste'); return impOpen(impSplit(t ? t.value : '')); }
   else if (act === 'impApply') return impApply(id);
   else if (act === 'impCancel') { UI.imp = null; $('#overlay').innerHTML = ''; return; }
-  else if (act === 'photoPick') { const P = UI.photoPick; if (P && P.urls[+id]) { set(P.path, P.urls[+id]); applyEvent(S.cur); } UI.photoPick = null; $('#overlay').innerHTML = ''; render(); return; }
+  else if (act === 'photoPick') { const P = UI.photoPick; UI.photoPick = null; $('#overlay').innerHTML = ''; if (P && P.urls[+id]) useShirt(P.path, P.urls[+id]).then(render); else render(); return; }
   else if (act === 'photoGPT') { gptCopy(); return; }
+  else if (act === 'photoShare') { gptShare(); return; }
   else if (act === 'closeOv') { $('#overlay').innerHTML = ''; return; }
   render();
   if (act === 'step') window.scrollTo(0, 0);
@@ -1676,10 +1710,10 @@ document.addEventListener('change', ev => {
   r.onload = async () => {
     const isShirt = /^data\.wear\.(home|away)?\.?photo$/.test(path);
     if (isShirt) {
-      if (await seeThrough(r.result)) { set(path, r.result); applyEvent(S.cur); render(); if (path === 'data.wear.home.photo') paletteFrom(r.result); return; }
+      if (await seeThrough(r.result)) { await useShirt(path, r.result); render(); if (path === 'data.wear.home.photo') paletteFrom(r.result); return; }
       let opts = []; try { opts = await cutoutChoices(r.result); } catch (e) {}
       const busy = await borderBusy(r.result), first = opts[0] && !busy ? opts[0].url : r.result;
-      set(path, first); applyEvent(S.cur); render();
+      await useShirt(path, first); render();
       if (path === 'data.wear.home.photo') paletteFrom(r.result);
       UI.photoPick = { path, urls: [...opts.map(o => o.url), r.result], orig: r.result };
       const tiles = UI.photoPick.urls.map((u, i) => `<button class="picktile${UI.photoPick.urls[i] === first ? ' on' : ''}" data-act="photoPick" data-id="${i}" aria-label="${i === UI.photoPick.urls.length - 1 ? 'The original photo' : 'Cut-out ' + (i + 1)}"><img src="${u}" alt=""><span>${i === UI.photoPick.urls.length - 1 ? 'Original' : 'Cut-out'}</span></button>`).join('');
@@ -1687,8 +1721,10 @@ document.addEventListener('change', ev => {
         <p style="margin:0 0 10px">${opts.length ? 'Here’s the shirt with the background taken out, and your photo as it is. Tap the one that looks best.' : 'I couldn’t separate the shirt from the background in this one.'} A white jersey cuts out best laid on something dark.</p>
         <div class="pickrow">${tiles}</div>
         <div class="gpt"><p class="eyebrow">${opts.length ? 'Not clean enough? Ask ChatGPT' : 'Ask ChatGPT to cut it out'}</p>
-          <p style="margin:0 0 8px">A free ChatGPT account can cut it out. Copy the photo, open ChatGPT, paste it and send. Save the picture it makes, then add that one here instead.</p>
-          <div class="btns"><button class="btn alt" data-act="photoGPT" id="gptCopy">Copy photo</button><a class="btn alt" href="https://chatgpt.com/?q=${encodeURIComponent(GPT_PROMPT)}" target="_blank" rel="noopener">Open ChatGPT</a></div></div></div></div>`;
+          ${canShareFile() ? `<p style="margin:0 0 8px">A free ChatGPT account can cut it out. Tap below, pick ChatGPT and send. Save the picture it makes, then add that one here instead.</p>
+          <div class="btns"><button class="btn alt" data-act="photoShare">Send photo to ChatGPT</button></div>`
+          : `<p style="margin:0 0 8px">A free ChatGPT account can cut it out. Copy the photo, open ChatGPT, paste it and send. Save the picture it makes, then add that one here instead.</p>
+          <div class="btns"><button class="btn alt" data-act="photoGPT" id="gptCopy">Copy photo</button><a class="btn alt" href="https://chatgpt.com/?q=${encodeURIComponent(GPT_PROMPT)}" target="_blank" rel="noopener">Open ChatGPT</a></div>`}</div></div></div>`;
       return;
     }
     set(path, r.result); render();
