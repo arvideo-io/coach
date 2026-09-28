@@ -840,7 +840,7 @@ async function cutoutChoices(dataUrl) {
   return out.filter((o, i) => !i || (Math.abs(o.frac - out[0].frac) >= .03 && 1 - o.frac > (1 - out[0].frac) * .75));
 }
 // the coach's own ChatGPT does the cut-out when ours can't; we only copy the photo and fill in the ask
-const GPT_PROMPT = 'I am pasting a photo of a sports jersey. Cut out just the jersey (or jerseys) and give it back as a PNG with a transparent background. Keep the colors, numbers and logos exactly as they are, do not redraw anything.';
+const GPT_PROMPT = 'I am pasting a photo of a sports jersey. Remove only the background and give it back as a PNG with a transparent background. Keep the jersey (or jerseys) exactly as in my photo: same angle, same perspective, same size in the frame, same colors, numbers and logos. Do not straighten, redraw or restyle anything.';
 // built synchronously from the data URL, so the share stays inside the tap (Safari drops it after an await)
 function photoFile(dataUrl) {
   const [head, b64] = dataUrl.split(','), type = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
@@ -895,6 +895,18 @@ async function borderBusy(dataUrl) {
     let n = 0; for (let i = 0; i < ring.length; i++) { const a = ring[i] * 4, b = ring[(i + 1) % ring.length] * 4;
       if (Math.abs(px[a] - px[b]) + Math.abs(px[a + 1] - px[b + 1]) + Math.abs(px[a + 2] - px[b + 2]) > 16) n++; }
     return n / ring.length > .08; } catch (e) { return false; }
+}
+// crop away see-through margins (plus 2 px), so the shirt fills the card the same as our own cut-outs do
+async function trimClear(dataUrl) {
+  try { const im = await loadImg(dataUrl), sc = Math.min(1, 1200 / Math.max(im.width, im.height));
+    const W = Math.max(1, Math.round(im.width * sc)), H = Math.max(1, Math.round(im.height * sc));
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); x.drawImage(im, 0, 0, W, H);
+    const a = x.getImageData(0, 0, W, H).data; let x1 = W, y1 = H, x2 = -1, y2 = -1;
+    for (let y = 0; y < H; y++) for (let q = 0; q < W; q++) if (a[(y * W + q) * 4 + 3] > 24) { if (q < x1) x1 = q; if (q > x2) x2 = q; if (y < y1) y1 = y; if (y > y2) y2 = y; }
+    if (x2 < 0) return dataUrl;
+    const pad = 2, o = document.createElement('canvas'); o.width = x2 - x1 + 1 + pad * 2; o.height = y2 - y1 + 1 + pad * 2;
+    o.getContext('2d').drawImage(c, x1, y1, x2 - x1 + 1, y2 - y1 + 1, pad, pad, x2 - x1 + 1, y2 - y1 + 1);
+    return o.toDataURL('image/png'); } catch (e) { return dataUrl; }
 }
 async function seeThrough(dataUrl) {
   if (!/^data:image\/(png|webp)/.test(dataUrl)) return false;
@@ -1713,7 +1725,7 @@ document.addEventListener('change', ev => {
   r.onload = async () => {
     const isShirt = /^data\.wear\.(home|away)?\.?photo$/.test(path);
     if (isShirt) {
-      if (await seeThrough(r.result)) { await useShirt(path, r.result); render(); if (path === 'data.wear.home.photo') paletteFrom(r.result); return; }
+      if (await seeThrough(r.result)) { const t = await trimClear(r.result); await useShirt(path, t); render(); if (path === 'data.wear.home.photo') paletteFrom(t); return; }
       let opts = []; try { opts = await cutoutChoices(r.result); } catch (e) {}
       const busy = await borderBusy(r.result), first = opts[0] && !busy ? opts[0].url : r.result;
       await useShirt(path, first); render();
